@@ -33,7 +33,7 @@
         }
         .exchange-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
             margin: 2rem 0;
         }
@@ -57,16 +57,6 @@
         }
         .exchange-card .badge { font-size: 0.7rem; background: #2a3340; padding: 0.2rem 0.6rem; border-radius: 20px; color: #a0b0c0; }
         .exchange-card .info { font-size: 0.85rem; color: #8a9aae; margin: 0.3rem 0 0.8rem 0; flex: 1; }
-        .exchange-card .highlight {
-            background: #1a2a1a;
-            border: 1px solid #2a6a3a;
-            border-radius: 6px;
-            padding: 0.2rem 0.6rem;
-            font-size: 0.75rem;
-            color: #7acc8a;
-            text-align: center;
-            margin-bottom: 0.5rem;
-        }
         .exchange-card button {
             background: #f0b90b;
             border: none;
@@ -204,12 +194,12 @@
         .export-section .clear-btn:hover { background: #7a3a3a; }
 
         .warning-box {
-            background: #2a1a1a;
-            border: 1px solid #8a3a3a;
+            background: #1a2a1a;
+            border: 1px solid #3a8a3a;
             border-radius: 8px;
             padding: 0.6rem 1rem;
             margin: 1rem 0;
-            color: #e8a0a0;
+            color: #a0e0a0;
             font-size: 0.9rem;
         }
         .warning-box strong { color: #f0b90b; }
@@ -224,9 +214,9 @@
     <div class="sub">Baixe, armazene e consolide dados de funding rate das principais exchanges</div>
 
     <div class="warning-box">
-        ⚠️ <strong>Importante:</strong> Para obter o histórico completo (milhares de registros), 
-        utilize o card <strong>"Binance (CSV mensal)"</strong> – ele baixa todos os CSVs desde 2019.
-        Os outros cards (API) podem ter limites de 200-1000 registros.
+        ✅ <strong>Histórico completo via API da Binance</strong><br>
+        A fonte CSV está indisponível no momento. Usamos a API oficial com paginação robusta – 
+        ela baixa todos os registros desde o início do contrato (milhares de registros).
     </div>
 
     <div class="top-actions">
@@ -276,65 +266,10 @@
 
 <script>
     // ========================================================================
-    //  EXCHANGES – COM ÊNFASE NA FONTE CSV (HISTÓRICO COMPLETO)
+    //  EXCHANGES – APENAS COM API (CSV REMOVIDO POR 404)
     // ========================================================================
     const EXCHANGES = {
-        // ★★★ FONTE RECOMENDADA – HISTÓRICO COMPLETO DESDE 2019 ★★★
-        binance_csv: {
-            label: '⭐ Binance (CSV mensal)',
-            color: '#f0b90b',
-            async fetch(symbol = 'BTCUSDT') {
-                const now = new Date();
-                const start = new Date(2019, 8, 1); // Setembro 2019
-                const months = [];
-                let current = new Date(start);
-                while (current <= now) {
-                    const y = current.getFullYear();
-                    const m = String(current.getMonth() + 1).padStart(2, '0');
-                    months.push(`${y}-${m}`);
-                    current.setMonth(current.getMonth() + 1);
-                }
-
-                const all = [];
-                let total = 0;
-                for (const ym of months) {
-                    const url = `https://data.binance.vision/data/futures/um/daily/fundingRate/${symbol}/${symbol}-fundingRate-${ym}.csv`;
-                    console.log(`[Binance CSV] Baixando ${ym}...`);
-                    try {
-                        const resp = await fetch(url);
-                        if (!resp.ok) {
-                            console.log(`[Binance CSV] Arquivo não encontrado: ${ym}`);
-                            continue;
-                        }
-                        const text = await resp.text();
-                        const lines = text.split('\n').filter(line => line.trim() !== '');
-                        for (let i = 1; i < lines.length; i++) {
-                            const parts = lines[i].split(',');
-                            if (parts.length < 3) continue;
-                            const timestamp = parseInt(parts[0]);
-                            const rate = parseFloat(parts[1]);
-                            if (isNaN(timestamp) || isNaN(rate)) continue;
-                            all.push({
-                                exchange: 'binance_csv',
-                                symbol: symbol,
-                                timestamp: new Date(timestamp),
-                                rate: rate,
-                                _raw: { ts: timestamp, rate }
-                            });
-                            total++;
-                        }
-                        await new Promise(r => setTimeout(r, 200));
-                    } catch (e) {
-                        console.warn(`[Binance CSV] Erro em ${ym}:`, e);
-                    }
-                }
-                console.log(`[Binance CSV] ✅ Total baixado: ${total} registros`);
-                return all;
-            }
-        },
-
-        // === OUTRAS FONTES (podem ter limites) ===
-        binance_api: {
+        binance: {
             label: 'Binance (API)',
             color: '#f0b90b',
             async fetch(symbol = 'BTCUSDT', limit = 1000) {
@@ -344,25 +279,52 @@
                 let hasMore = true;
                 let page = 1;
                 while (hasMore) {
-                    const params = new URLSearchParams({ symbol, limit: Math.min(limit, 1000) });
+                    const params = new URLSearchParams({
+                        symbol,
+                        limit: Math.min(limit, 1000)
+                    });
                     if (startTime) params.append('startTime', startTime);
                     const url = `${base}?${params}`;
-                    console.log(`[Binance API] Página ${page} - startTime: ${startTime || 'início'}`);
-                    const resp = await fetch(url);
-                    if (!resp.ok) throw new Error(`Binance API HTTP ${resp.status}`);
-                    const data = await resp.json();
-                    console.log(`[Binance API] Recebidos ${data.length} registros na página ${page}`);
-                    if (!data.length) break;
+                    console.log(`[Binance] Página ${page} - startTime: ${startTime || 'início'}`);
+                    
+                    let data = null;
+                    let tentativas = 0;
+                    while (tentativas < 3) {
+                        try {
+                            const resp = await fetch(url);
+                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                            data = await resp.json();
+                            break;
+                        } catch (e) {
+                            tentativas++;
+                            console.warn(`[Binance] Tentativa ${tentativas} falhou:`, e);
+                            if (tentativas === 3) throw e;
+                            await new Promise(r => setTimeout(r, 2000 * tentativas));
+                        }
+                    }
+                    
+                    if (!data || !data.length) {
+                        console.log(`[Binance] Nenhum dado retornado na página ${page}`);
+                        break;
+                    }
+                    
+                    console.log(`[Binance] Recebidos ${data.length} registros na página ${page}`);
                     all = all.concat(data);
-                    const last = data[data.length - 1];
-                    startTime = last.fundingTime;
-                    if (data.length < limit) hasMore = false;
-                    page++;
-                    await new Promise(r => setTimeout(r, 500));
+                    
+                    // Se veio menos que o limit, não há mais páginas
+                    if (data.length < limit) {
+                        hasMore = false;
+                    } else {
+                        // O último item é o mais antigo (API retorna ordem decrescente)
+                        const last = data[data.length - 1];
+                        startTime = last.fundingTime;
+                        page++;
+                        await new Promise(r => setTimeout(r, 1000)); // pausa de 1s
+                    }
                 }
-                console.log(`[Binance API] Total baixado: ${all.length} registros`);
+                console.log(`[Binance] ✅ Total baixado: ${all.length} registros`);
                 return all.map(item => ({
-                    exchange: 'binance_api',
+                    exchange: 'binance',
                     symbol: item.symbol,
                     timestamp: new Date(item.fundingTime),
                     rate: parseFloat(item.fundingRate),
@@ -380,7 +342,11 @@
                 let hasMore = true;
                 let page = 1;
                 while (hasMore) {
-                    const params = new URLSearchParams({ category: 'linear', symbol, limit: Math.min(limit, 200) });
+                    const params = new URLSearchParams({
+                        category: 'linear',
+                        symbol,
+                        limit: Math.min(limit, 200)
+                    });
                     if (cursor) params.append('cursor', cursor);
                     const url = `${base}?${params}`;
                     console.log(`[Bybit] Página ${page} - cursor: ${cursor || 'início'}`);
@@ -397,7 +363,7 @@
                     page++;
                     await new Promise(r => setTimeout(r, 500));
                 }
-                console.log(`[Bybit] Total baixado: ${all.length} registros`);
+                console.log(`[Bybit] ✅ Total baixado: ${all.length} registros`);
                 return all.map(item => ({
                     exchange: 'bybit',
                     symbol: item.symbol,
@@ -417,7 +383,12 @@
                 let hasMore = true;
                 let page = 1;
                 while (hasMore) {
-                    const params = new URLSearchParams({ symbol, count: Math.min(limit, 1000), start, reverse: false });
+                    const params = new URLSearchParams({
+                        symbol,
+                        count: Math.min(limit, 1000),
+                        start,
+                        reverse: false
+                    });
                     const url = `${base}?${params}`;
                     console.log(`[BitMEX] Página ${page} - start: ${start}`);
                     const resp = await fetch(url);
@@ -431,7 +402,7 @@
                     page++;
                     await new Promise(r => setTimeout(r, 500));
                 }
-                console.log(`[BitMEX] Total baixado: ${all.length} registros`);
+                console.log(`[BitMEX] ✅ Total baixado: ${all.length} registros`);
                 return all.map(item => ({
                     exchange: 'bitmex',
                     symbol: item.symbol,
@@ -451,7 +422,10 @@
                 let hasMore = true;
                 let page = 1;
                 while (hasMore) {
-                    const params = new URLSearchParams({ instId: symbol, limit: Math.min(limit, 100) });
+                    const params = new URLSearchParams({
+                        instId: symbol,
+                        limit: Math.min(limit, 100)
+                    });
                     if (before) params.append('before', before);
                     const url = `${base}?${params}`;
                     console.log(`[OKX] Página ${page} - before: ${before || 'início'}`);
@@ -469,7 +443,7 @@
                     page++;
                     await new Promise(r => setTimeout(r, 500));
                 }
-                console.log(`[OKX] Total baixado: ${all.length} registros`);
+                console.log(`[OKX] ✅ Total baixado: ${all.length} registros`);
                 return all.map(item => ({
                     exchange: 'okx',
                     symbol: item.instId,
@@ -562,17 +536,12 @@
             const card = document.createElement('div');
             card.className = 'exchange-card';
             card.dataset.exchange = key;
-            // Destaca a fonte CSV
-            const highlight = key === 'binance_csv' 
-                ? '<div class="highlight">✅ HISTÓRICO COMPLETO (milhares de registros)</div>' 
-                : '';
             card.innerHTML = `
                 <div class="name">
                     ${ex.label}
                     <span class="badge">${key}</span>
                 </div>
-                ${highlight}
-                <div class="info">Clique para baixar histórico</div>
+                <div class="info">Clique para baixar histórico completo</div>
                 <button data-exchange="${key}">⬇️ Baixar</button>
                 <div class="progress-container" id="progress-${key}">
                     <div class="progress-bar" id="progressBar-${key}"></div>
@@ -626,7 +595,7 @@
     }
 
     // ========================================================================
-    //  DOWNLOAD (COM ATENÇÃO ESPECIAL PARA O CSV)
+    //  DOWNLOAD (com paginação robusta e retry)
     // ========================================================================
     async function downloadExchange(exchangeKey) {
         const ex = EXCHANGES[exchangeKey];
@@ -660,19 +629,14 @@
             const customFetch = async (sym, limit) => {
                 const data = await originalFetch(sym, limit);
                 totalFetched += data.length;
-                // Para CSV, estima 100% quando chegar a 5000 (ou ao final)
-                const pct = Math.min((totalFetched / 5000) * 100, 99);
+                // Estima progresso (apenas visual)
+                const pct = Math.min((totalFetched / 10000) * 100, 99);
                 updateProgress(pct);
                 return data;
             };
 
             ex.fetch = customFetch;
-            let rates;
-            if (exchangeKey === 'binance_csv') {
-                rates = await ex.fetch(symbol);
-            } else {
-                rates = await ex.fetch(symbol, 1000);
-            }
+            const rates = await ex.fetch(symbol, 1000);
             ex.fetch = originalFetch;
 
             if (!rates.length) {
@@ -696,16 +660,13 @@
     }
 
     // ========================================================================
-    //  BAIXAR TODOS (prioriza a fonte CSV)
+    //  BAIXAR TODOS
     // ========================================================================
     async function downloadAll() {
-        // Baixa primeiro a fonte CSV (a mais completa)
-        const priority = ['binance_csv', 'binance_api', 'bybit', 'bitmex', 'okx'];
-        for (const key of priority) {
-            if (EXCHANGES[key]) {
-                await downloadExchange(key);
-                await new Promise(r => setTimeout(r, 1000));
-            }
+        const keys = Object.keys(EXCHANGES);
+        for (const key of keys) {
+            await downloadExchange(key);
+            await new Promise(r => setTimeout(r, 1000));
         }
         alert('✅ Download de todas as exchanges concluído!');
     }
