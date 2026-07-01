@@ -33,7 +33,7 @@
         }
         .exchange-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
             gap: 1rem;
             margin: 2rem 0;
         }
@@ -57,6 +57,16 @@
         }
         .exchange-card .badge { font-size: 0.7rem; background: #2a3340; padding: 0.2rem 0.6rem; border-radius: 20px; color: #a0b0c0; }
         .exchange-card .info { font-size: 0.85rem; color: #8a9aae; margin: 0.3rem 0 0.8rem 0; flex: 1; }
+        .exchange-card .highlight {
+            background: #1a2a1a;
+            border: 1px solid #2a6a3a;
+            border-radius: 6px;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.75rem;
+            color: #7acc8a;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
         .exchange-card button {
             background: #f0b90b;
             border: none;
@@ -193,6 +203,17 @@
         .export-section .clear-btn { background: #5a2a2a; margin-left: auto; }
         .export-section .clear-btn:hover { background: #7a3a3a; }
 
+        .warning-box {
+            background: #2a1a1a;
+            border: 1px solid #8a3a3a;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            margin: 1rem 0;
+            color: #e8a0a0;
+            font-size: 0.9rem;
+        }
+        .warning-box strong { color: #f0b90b; }
+
         @media (max-width: 600px) { h1 { font-size: 1.8rem; } .exchange-grid { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 400px) { .exchange-grid { grid-template-columns: 1fr; } }
     </style>
@@ -201,6 +222,12 @@
 <div class="app">
     <h1>📊 Funding Rates <small>coletor histórico</small></h1>
     <div class="sub">Baixe, armazene e consolide dados de funding rate das principais exchanges</div>
+
+    <div class="warning-box">
+        ⚠️ <strong>Importante:</strong> Para obter o histórico completo (milhares de registros), 
+        utilize o card <strong>"Binance (CSV mensal)"</strong> – ele baixa todos os CSVs desde 2019.
+        Os outros cards (API) podem ter limites de 200-1000 registros.
+    </div>
 
     <div class="top-actions">
         <label>📌 Símbolo:
@@ -249,15 +276,68 @@
 
 <script>
     // ========================================================================
-    //  EXCHANGES – INCLUINDO BINANCE VIA CSV MENSAIS
+    //  EXCHANGES – COM ÊNFASE NA FONTE CSV (HISTÓRICO COMPLETO)
     // ========================================================================
     const EXCHANGES = {
-        // === BINANCE VIA API (fallback) ===
+        // ★★★ FONTE RECOMENDADA – HISTÓRICO COMPLETO DESDE 2019 ★★★
+        binance_csv: {
+            label: '⭐ Binance (CSV mensal)',
+            color: '#f0b90b',
+            async fetch(symbol = 'BTCUSDT') {
+                const now = new Date();
+                const start = new Date(2019, 8, 1); // Setembro 2019
+                const months = [];
+                let current = new Date(start);
+                while (current <= now) {
+                    const y = current.getFullYear();
+                    const m = String(current.getMonth() + 1).padStart(2, '0');
+                    months.push(`${y}-${m}`);
+                    current.setMonth(current.getMonth() + 1);
+                }
+
+                const all = [];
+                let total = 0;
+                for (const ym of months) {
+                    const url = `https://data.binance.vision/data/futures/um/daily/fundingRate/${symbol}/${symbol}-fundingRate-${ym}.csv`;
+                    console.log(`[Binance CSV] Baixando ${ym}...`);
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) {
+                            console.log(`[Binance CSV] Arquivo não encontrado: ${ym}`);
+                            continue;
+                        }
+                        const text = await resp.text();
+                        const lines = text.split('\n').filter(line => line.trim() !== '');
+                        for (let i = 1; i < lines.length; i++) {
+                            const parts = lines[i].split(',');
+                            if (parts.length < 3) continue;
+                            const timestamp = parseInt(parts[0]);
+                            const rate = parseFloat(parts[1]);
+                            if (isNaN(timestamp) || isNaN(rate)) continue;
+                            all.push({
+                                exchange: 'binance_csv',
+                                symbol: symbol,
+                                timestamp: new Date(timestamp),
+                                rate: rate,
+                                _raw: { ts: timestamp, rate }
+                            });
+                            total++;
+                        }
+                        await new Promise(r => setTimeout(r, 200));
+                    } catch (e) {
+                        console.warn(`[Binance CSV] Erro em ${ym}:`, e);
+                    }
+                }
+                console.log(`[Binance CSV] ✅ Total baixado: ${total} registros`);
+                return all;
+            }
+        },
+
+        // === OUTRAS FONTES (podem ter limites) ===
         binance_api: {
             label: 'Binance (API)',
             color: '#f0b90b',
             async fetch(symbol = 'BTCUSDT', limit = 1000) {
-                // Mesmo código anterior com logs
                 const base = 'https://fapi.binance.com/fapi/v1/fundingRate';
                 let all = [];
                 let startTime = null;
@@ -290,65 +370,6 @@
                 }));
             }
         },
-
-        // === BINANCE VIA CSV MENSAIS (GITHUB) – HISTÓRICO COMPLETO ===
-        binance_csv: {
-            label: 'Binance (CSV mensal)',
-            color: '#f0b90b',
-            async fetch(symbol = 'BTCUSDT') {
-                // Lista de meses desde setembro de 2019 até hoje
-                const now = new Date();
-                const start = new Date(2019, 8, 1); // Setembro 2019
-                const months = [];
-                let current = new Date(start);
-                while (current <= now) {
-                    const y = current.getFullYear();
-                    const m = String(current.getMonth() + 1).padStart(2, '0');
-                    months.push(`${y}-${m}`);
-                    current.setMonth(current.getMonth() + 1);
-                }
-
-                const all = [];
-                let total = 0;
-                for (const ym of months) {
-                    const url = `https://data.binance.vision/data/futures/um/daily/fundingRate/${symbol}/${symbol}-fundingRate-${ym}.csv`;
-                    console.log(`[Binance CSV] Baixando ${url}`);
-                    try {
-                        const resp = await fetch(url);
-                        if (!resp.ok) {
-                            console.log(`[Binance CSV] Arquivo não encontrado: ${ym}`);
-                            continue;
-                        }
-                        const text = await resp.text();
-                        // Parse CSV (sem Papa Parse aqui para não depender)
-                        const lines = text.split('\n').filter(line => line.trim() !== '');
-                        // Pula cabeçalho
-                        for (let i = 1; i < lines.length; i++) {
-                            const parts = lines[i].split(',');
-                            if (parts.length < 3) continue;
-                            const timestamp = parseInt(parts[0]);
-                            const rate = parseFloat(parts[1]);
-                            if (isNaN(timestamp) || isNaN(rate)) continue;
-                            all.push({
-                                exchange: 'binance_csv',
-                                symbol: symbol,
-                                timestamp: new Date(timestamp),
-                                rate: rate,
-                                _raw: { ts: timestamp, rate }
-                            });
-                            total++;
-                        }
-                        // Pequena pausa para não sobrecarregar
-                        await new Promise(r => setTimeout(r, 200));
-                    } catch (e) {
-                        console.warn(`[Binance CSV] Erro ao baixar ${ym}:`, e);
-                    }
-                }
-                console.log(`[Binance CSV] Total baixado: ${total} registros`);
-                return all;
-            }
-        },
-
         bybit: {
             label: 'Bybit',
             color: '#5a8cff',
@@ -541,12 +562,17 @@
             const card = document.createElement('div');
             card.className = 'exchange-card';
             card.dataset.exchange = key;
+            // Destaca a fonte CSV
+            const highlight = key === 'binance_csv' 
+                ? '<div class="highlight">✅ HISTÓRICO COMPLETO (milhares de registros)</div>' 
+                : '';
             card.innerHTML = `
                 <div class="name">
                     ${ex.label}
                     <span class="badge">${key}</span>
                 </div>
-                <div class="info">Clique para baixar histórico completo</div>
+                ${highlight}
+                <div class="info">Clique para baixar histórico</div>
                 <button data-exchange="${key}">⬇️ Baixar</button>
                 <div class="progress-container" id="progress-${key}">
                     <div class="progress-bar" id="progressBar-${key}"></div>
@@ -600,22 +626,19 @@
     }
 
     // ========================================================================
-    //  DOWNLOAD (com suporte para CSV da Binance)
+    //  DOWNLOAD (COM ATENÇÃO ESPECIAL PARA O CSV)
     // ========================================================================
     async function downloadExchange(exchangeKey) {
         const ex = EXCHANGES[exchangeKey];
         if (!ex) return;
 
         let symbol = globalSymbol.value;
-        // Ajustes específicos
         if (exchangeKey === 'bitmex' && symbol !== 'XBTUSD') {
             symbol = 'XBTUSD';
-            console.log('[BitMEX] Forçando símbolo para XBTUSD');
         } else if (exchangeKey === 'okx' && !symbol.includes('-SWAP')) {
             if (symbol === 'BTCUSDT') symbol = 'BTC-USDT-SWAP';
             else if (symbol === 'ETHUSDT') symbol = 'ETH-USDT-SWAP';
             else symbol = 'BTC-USDT-SWAP';
-            console.log(`[OKX] Ajustando símbolo para ${symbol}`);
         }
 
         const card = document.querySelector(`.exchange-card[data-exchange="${exchangeKey}"]`);
@@ -634,11 +657,10 @@
                 progressBar.style.width = `${Math.min(pct, 100)}%`;
             };
 
-            // Wrapper com progresso
             const customFetch = async (sym, limit) => {
                 const data = await originalFetch(sym, limit);
                 totalFetched += data.length;
-                // Para CSV, estimamos 100% quando chegar a 5000 (ou menos)
+                // Para CSV, estima 100% quando chegar a 5000 (ou ao final)
                 const pct = Math.min((totalFetched / 5000) * 100, 99);
                 updateProgress(pct);
                 return data;
@@ -646,7 +668,6 @@
 
             ex.fetch = customFetch;
             let rates;
-            // Para a fonte CSV, não passamos limit
             if (exchangeKey === 'binance_csv') {
                 rates = await ex.fetch(symbol);
             } else {
@@ -662,7 +683,7 @@
             await saveRates(rates);
             updateProgress(100);
             await refreshDataList();
-            console.log(`[${ex.label}] Download concluído. Total de registros salvos: ${rates.length}`);
+            console.log(`✅ [${ex.label}] Download concluído. Total de registros salvos: ${rates.length}`);
 
         } catch (err) {
             alert(`Erro ao baixar ${ex.label}: ${err.message}`);
@@ -675,13 +696,16 @@
     }
 
     // ========================================================================
-    //  BAIXAR TODOS
+    //  BAIXAR TODOS (prioriza a fonte CSV)
     // ========================================================================
     async function downloadAll() {
-        const keys = Object.keys(EXCHANGES);
-        for (const key of keys) {
-            await downloadExchange(key);
-            await new Promise(r => setTimeout(r, 1000));
+        // Baixa primeiro a fonte CSV (a mais completa)
+        const priority = ['binance_csv', 'binance_api', 'bybit', 'bitmex', 'okx'];
+        for (const key of priority) {
+            if (EXCHANGES[key]) {
+                await downloadExchange(key);
+                await new Promise(r => setTimeout(r, 1000));
+            }
         }
         alert('✅ Download de todas as exchanges concluído!');
     }
