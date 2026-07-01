@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Coletor de Funding Rates</title>
+    <style>
+        /* ===== RESET & GLOBAL ===== */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0b0e14;
+            color: #e0e6ed;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+        .app {
+            max-width: 1200px;
+            width: 100%;
+        }
+        h1 {
+            font-weight: 400;
+            font-size: 2.2rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        h1 small {
+            font-size: 1rem;
+            color: #7a8a9e;
+            font-weight: 300;
+        }
+        .sub {
+            color: #7a8a9e;
+            margin-bottom: 2rem;
+            border-left: 3px solid #f0b90b;
+            padding-left: 1rem;
+        }
+
+        /* ===== GRID DE EXCHANGES ===== */
+        .exchange-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .exchange-card {
+            background: #141a23;
+            border-radius: 12px;
+            padding: 1.2rem 1rem;
+            border: 1px solid #2a3340;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .exchange-card:hover {
+            border-color: #f0b90b;
+            box-shadow: 0 0 20px rgba(240, 185, 11, 0.05);
+        }
+        .exchange-card .name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .exchange-card .badge {
+            font-size: 0.7rem;
+            background: #2a3340;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            color: #a0b0c0;
+        }
+        .exchange-card .info {
+            font-size: 0.85rem;
+            color: #8a9aae;
+            margin: 0.3rem 0 0.8rem 0;
+            flex: 1;
+        }
+        .exchange-card button {
+            background: #f0b90b;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 0;
+            font-weight: 600;
+            color: #0b0e14;
+            cursor: pointer;
+            transition: 0.15s;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        .exchange-card button:hover {
+            background: #d9a40a;
+            transform: scale(1.02);
+        }
+        .exchange-card button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .progress-container {
+            height: 4px;
+            background: #2a3340;
+            border-radius: 4px;
+            margin: 0.5rem 0 0 0;
+            overflow: hidden;
+            visibility: hidden;
+        }
+        .progress-container.active {
+            visibility: visible;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #f0b90b;
+            transition: width 0.2s;
+        }
+
+        /* ===== FILTROS E LISTA ===== */
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            margin: 2rem 0 1rem 0;
+            background: #141a23;
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid #2a3340;
+        }
+        .filters label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #b0c0d0;
+        }
+        .filters select, .filters input {
+            background: #1e2732;
+            border: 1px solid #2a3340;
+            color: #e0e6ed;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .filters input {
+            width: 120px;
+        }
+        .filters button {
+            background: #2a3340;
+            border: none;
+            color: #e0e6ed;
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.15s;
+            font-weight: 500;
+        }
+        .filters button:hover {
+            background: #3a4a5a;
+        }
+
+        .data-list {
+            background: #141a23;
+            border-radius: 12px;
+            border: 1px solid #2a3340;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .data-list table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .data-list th {
+            text-align: left;
+            padding: 0.6rem 0.4rem;
+            border-bottom: 1px solid #2a3340;
+            color: #8a9aae;
+            font-weight: 400;
+            position: sticky;
+            top: 0;
+            background: #141a23;
+        }
+        .data-list td {
+            padding: 0.5rem 0.4rem;
+            border-bottom: 1px solid #1e2732;
+            font-feature-settings: "tnum";
+        }
+        .data-list tr:hover td {
+            background: #1e2732;
+        }
+        .empty-message {
+            color: #6a7a8e;
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        /* ===== BOTÃO EXPORTAR ===== */
+        .export-section {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+        .export-section button {
+            background: #1a7a3a;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.8rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.15s;
+            font-size: 1rem;
+        }
+        .export-section button:hover {
+            background: #22944a;
+        }
+        .export-section .count {
+            color: #7a8a9e;
+            font-size: 0.9rem;
+        }
+
+        /* ===== RESPONSIVO ===== */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .exchange-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 400px) {
+            .exchange-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <h1>📊 Funding Rates <small>coletor histórico</small></h1>
+    <div class="sub">Baixe, armazene e consolide dados de funding rate das principais exchanges</div>
+
+    <!-- Grid de Exchanges -->
+    <div class="exchange-grid" id="exchangeGrid">
+        <!-- Cards serão injetados via JS -->
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters">
+        <label>🔍 Símbolo:
+            <select id="symbolFilter">
+                <option value="">Todos</option>
+                <option value="BTCUSDT">BTCUSDT</option>
+                <option value="ETHUSDT">ETHUSDT</option>
+                <option value="SOLUSDT">SOLUSDT</option>
+                <option value="ADAUSDT">ADAUSDT</option>
+                <option value="DOGEUSDT">DOGEUSDT</option>
+            </select>
+        </label>
+        <label>📅 Data início:
+            <input type="date" id="dateFrom">
+        </label>
+        <label>📅 Data fim:
+            <input type="date" id="dateTo">
+        </label>
+        <button id="applyFiltersBtn">Aplicar</button>
+        <button id="clearFiltersBtn">Limpar</button>
+    </div>
+
+    <!-- Lista de dados -->
+    <div class="data-list" id="dataList">
+        <div class="empty-message">Nenhum dado carregado. Clique em "Baixar" para começar.</div>
+    </div>
+
+    <!-- Exportação -->
+    <div class="export-section">
+        <button id="exportBtn">⬇️ Exportar Consolidado (CSV)</button>
+        <span class="count" id="recordCount">0 registros no banco</span>
+        <button id="clearAllBtn" style="background:#5a2a2a; margin-left:auto;">🗑️ Limpar tudo</button>
+    </div>
+</div>
+
+<script>
+    // ========================================================================
+    //  CONFIGURAÇÕES DAS EXCHANGES
+    // ========================================================================
+    const EXCHANGES = {
+        binance: {
+            label: 'Binance',
+            color: '#f0b90b',
+            async fetch(symbol = 'BTCUSDT', limit = 1000) {
+                // API pública da Binance - funding rate histórico
+                const base = 'https://fapi.binance.com/fapi/v1/fundingRate';
+                let all = [];
+                let startTime = null;
+                let hasMore = true;
+                while (hasMore) {
+                    const params = new URLSearchParams({
+                        symbol,
+                        limit: Math.min(limit, 1000),
+                    });
+                    if (startTime) params.append('startTime', startTime);
+                    const url = `${base}?${params}`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    if (!data.length) break;
+                    all = all.concat(data);
+                    // A última data (mais antiga) vira o próximo startTime
+                    const last = data[data.length - 1];
+                    startTime = last.fundingTime;
+                    // Se veio menos que o limit, acabou
+                    if (data.length < limit) hasMore = false;
+                    // Pequena pausa para não sobrecarregar
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                return all.map(item => ({
+                    exchange: 'binance',
+                    symbol: item.symbol,
+                    timestamp: new Date(item.fundingTime),
+                    rate: parseFloat(item.fundingRate),
+                    // campos adicionais
+                    _raw: item,
+                }));
+            }
+        },
+        bybit: {
+            label: 'Bybit',
+            color: '#5a8cff',
+            async fetch(symbol = 'BTCUSDT', limit = 200) {
+                // Bybit v5 funding rate history
+                const base = 'https://api.bybit.com/v5/market/funding/history';
+                let all = [];
+                let cursor = null;
+                let hasMore = true;
+                while (hasMore) {
+                    const params = new URLSearchParams({
+                        category: 'linear',
+                        symbol,
+                        limit: Math.min(limit, 200),
+                    });
+                    if (cursor) params.append('cursor', cursor);
+                    const url = `${base}?${params}`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`Bybit HTTP ${resp.status}`);
+                    const json = await resp.json();
+                    if (json.retCode !== 0) throw new Error(`Bybit API error: ${json.retMsg}`);
+                    const list = json.result.list || [];
+                    if (!list.length) break;
+                    all = all.concat(list);
+                    cursor = json.result.nextPageCursor;
+                    if (!cursor) hasMore = false;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                return all.map(item => ({
+                    exchange: 'bybit',
+                    symbol: item.symbol,
+                    timestamp: new Date(Number(item.fundingTime)),
+                    rate: parseFloat(item.fundingRate),
+                    _raw: item,
+                }));
+            }
+        },
+        bitmex: {
+            label: 'BitMEX',
+            color: '#f7931a',
+            async fetch(symbol = 'XBTUSD', limit = 1000) {
+                // BitMEX funding API
+                const base = 'https://www.bitmex.com/api/v1/funding';
+                let all = [];
+                let start = 0;
+                let hasMore = true;
+                while (hasMore) {
+                    const params = new URLSearchParams({
+                        symbol,
+                        count: Math.min(limit, 1000),
+                        start,
+                        reverse: false,
+                    });
+                    const url = `${base}?${params}`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`BitMEX HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    if (!data.length) break;
+                    all = all.concat(data);
+                    if (data.length < limit) hasMore = false;
+                    start += data.length;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                return all.map(item => ({
+                    exchange: 'bitmex',
+                    symbol: item.symbol,
+                    timestamp: new Date(item.timestamp),
+                    rate: parseFloat(item.fundingRate),
+                    _raw: item,
+                }));
+            }
+        },
+        okx: {
+            label: 'OKX (3 meses)',
+            color: '#1a8cff',
+            async fetch(symbol = 'BTC-USDT-SWAP', limit = 100) {
+                // OKX limita a ~3 meses no endpoint público
+                const base = 'https://www.okx.com/api/v5/public/funding-rate-history';
+                let all = [];
+                let before = null;
+                let hasMore = true;
+                while (hasMore) {
+                    const params = new URLSearchParams({
+                        instId: symbol,
+                        limit: Math.min(limit, 100),
+                    });
+                    if (before) params.append('before', before);
+                    const url = `${base}?${params}`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`OKX HTTP ${resp.status}`);
+                    const json = await resp.json();
+                    if (json.code !== '0') throw new Error(`OKX API error: ${json.msg}`);
+                    const data = json.data || [];
+                    if (!data.length) break;
+                    all = all.concat(data);
+                    // O último timestamp (mais antigo) vira o 'before'
+                    const last = data[data.length - 1];
+                    before = last.fundingTime;
+                    if (data.length < limit) hasMore = false;
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                return all.map(item => ({
+                    exchange: 'okx',
+                    symbol: item.instId,
+                    timestamp: new Date(Number(item.fundingTime)),
+                    rate: parseFloat(item.fundingRate),
+                    _raw: item,
+                }));
+            }
+        },
+        // Tardis.dev – requer chave, deixamos como exemplo de integração
+        tardis: {
+            label: 'Tardis.dev',
+            color: '#b44cff',
+            async fetch(symbol = 'binance-BTCUSDT', limit = 1000) {
+                // Exemplo com dataset gratuito (limitado)
+                // Para usar, insira sua chave abaixo ou remova esta exchange.
+                const apiKey = 'SUA_API_KEY_AQUI';
+                if (!apiKey || apiKey === 'SUA_API_KEY_AQUI') {
+                    throw new Error('Configure sua chave de API Tardis.dev');
+                }
+                // Tardis não tem endpoint direto de funding rate gratuito? 
+                // Na prática, usa-se o dataset de trades ou mensal. 
+                // Vamos simular um aviso.
+                throw new Error('Tardis.dev requer integração específica; consulte a documentação.');
+            }
+        }
+    };
+
+    // ========================================================================
+    //  GERENCIAMENTO DO INDEXEDDB
+    // ========================================================================
+    const DB_NAME = 'FundingRatesDB';
+    const STORE_NAME = 'rates';
+    let db = null;
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = (ev) => {
+                const db = ev.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('exchange', 'exchange', { unique: false });
+                    store.createIndex('symbol', 'symbol', { unique: false });
+                    store.createIndex('timestamp', 'timestamp', { unique: false });
+                }
+            };
+            request.onsuccess = (ev) => {
+                db = ev.target.result;
+                resolve(db);
+            };
+            request.onerror = (ev) => reject(ev.target.error);
+        });
+    }
+
+    async function saveRates(rates) {
+        if (!db) await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        for (const rate of rates) {
+            // Evita duplicatas baseado em exchange+symbol+timestamp (aproximado)
+            // Como simplificação, apenas adicionamos; em produção, poderia fazer upsert.
+            store.add(rate);
+        }
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = (ev) => reject(ev.target.error);
+        });
+    }
+
+    async function getAllRates() {
+        if (!db) await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function clearAllRates() {
+        if (!db) await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.clear();
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = (ev) => reject(ev.target.error);
+        });
+    }
+
+    async function countRates() {
+        if (!db) await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        return new Promise((resolve, reject) => {
+            const request = store.count();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // ========================================================================
+    //  INTERFACE
+    // ========================================================================
+    const exchangeGrid = document.getElementById('exchangeGrid');
+    const dataListEl = document.getElementById('dataList');
+    const symbolFilter = document.getElementById('symbolFilter');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    const applyBtn = document.getElementById('applyFiltersBtn');
+    const clearBtn = document.getElementById('clearFiltersBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const recordCount = document.getElementById('recordCount');
+
+    // Cria os cards de exchange
+    function renderExchangeCards() {
+        exchangeGrid.innerHTML = '';
+        for (const [key, ex] of Object.entries(EXCHANGES)) {
+            const card = document.createElement('div');
+            card.className = 'exchange-card';
+            card.dataset.exchange = key;
+            card.innerHTML = `
+                <div class="name">
+                    ${ex.label}
+                    <span class="badge">${key}</span>
+                </div>
+                <div class="info">Clique para baixar histórico completo</div>
+                <button data-exchange="${key}">⬇️ Baixar</button>
+                <div class="progress-container" id="progress-${key}">
+                    <div class="progress-bar" id="progressBar-${key}"></div>
+                </div>
+            `;
+            exchangeGrid.appendChild(card);
+        }
+        // Event listeners
+        document.querySelectorAll('.exchange-card button').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const exchangeKey = btn.dataset.exchange;
+                await downloadExchange(exchangeKey);
+            });
+        });
+    }
+
+    // Atualiza a lista de dados com filtros
+    async function refreshDataList() {
+        const all = await getAllRates();
+        const filterSymbol = symbolFilter.value;
+        const from = dateFrom.value ? new Date(dateFrom.value) : null;
+        const to = dateTo.value ? new Date(dateTo.value) : null;
+
+        let filtered = all;
+        if (filterSymbol) {
+            filtered = filtered.filter(r => r.symbol === filterSymbol);
+        }
+        if (from) {
+            filtered = filtered.filter(r => r.timestamp >= from);
+        }
+        if (to) {
+            // Ajusta para fim do dia
+            const end = new Date(to);
+            end.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(r => r.timestamp <= end);
+        }
+        // Ordena por timestamp decrescente (mais recente primeiro)
+        filtered.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Atualiza contador
+        recordCount.textContent = `${all.length} registros no banco`;
+
+        if (!filtered.length) {
+            dataListEl.innerHTML = `<div class="empty-message">Nenhum registro encontrado com os filtros atuais.</div>`;
+            return;
+        }
+
+        // Monta tabela
+        let html = `<table>
+            <thead><tr>
+                <th>Exchange</th><th>Símbolo</th><th>Timestamp</th><th>Funding Rate</th>
+            </tr></thead><tbody>`;
+        // Mostra no máximo 100 para não sobrecarregar
+        const display = filtered.slice(0, 100);
+        for (const r of display) {
+            const ts = r.timestamp.toLocaleString();
+            const rate = (r.rate * 100).toFixed(4) + '%';
+            html += `<tr>
+                <td>${r.exchange}</td>
+                <td>${r.symbol}</td>
+                <td>${ts}</td>
+                <td>${rate}</td>
+            </tr>`;
+        }
+        if (filtered.length > 100) {
+            html += `<tr><td colspan="4" style="text-align:center;color:#6a7a8e;">... e mais ${filtered.length - 100} registros</td></tr>`;
+        }
+        html += '</tbody></table>';
+        dataListEl.innerHTML = html;
+    }
+
+    // ========================================================================
+    //  FUNÇÃO DE DOWNLOAD (com progresso)
+    // ========================================================================
+    async function downloadExchange(exchangeKey) {
+        const ex = EXCHANGES[exchangeKey];
+        if (!ex) return;
+
+        const card = document.querySelector(`.exchange-card[data-exchange="${exchangeKey}"]`);
+        const btn = card.querySelector('button');
+        const progressContainer = document.getElementById(`progress-${exchangeKey}`);
+        const progressBar = document.getElementById(`progressBar-${exchangeKey}`);
+
+        btn.disabled = true;
+        progressContainer.classList.add('active');
+        progressBar.style.width = '0%';
+
+        try {
+            // Escolhe um símbolo padrão (poderia ser configurável)
+            const symbol = 'BTCUSDT'; // ou 'XBTUSD' para BitMEX, etc.
+            // Para BitMEX, usamos XBTUSD
+            const sym = exchangeKey === 'bitmex' ? 'XBTUSD' : (exchangeKey === 'okx' ? 'BTC-USDT-SWAP' : 'BTCUSDT');
+
+            // Função de progresso (estimado)
+            let progress = 0;
+            const updateProgress = (pct) => {
+                progressBar.style.width = `${Math.min(pct, 100)}%`;
+            };
+            // Como não sabemos o total, simulamos com base em lotes
+            // Vamos passar um callback para a função fetch
+            let totalFetched = 0;
+            const customFetch = async (symbol, limit) => {
+                // Chamamos a função original, mas com um wrapper para contar
+                const data = await ex.fetch(symbol, limit);
+                totalFetched += data.length;
+                // Estima progresso: se já tiver 5000, considera 100% (mas continua)
+                const pct = Math.min((totalFetched / 5000) * 100, 99);
+                updateProgress(pct);
+                return data;
+            };
+
+            // Substitui temporariamente o método fetch
+            const originalFetch = ex.fetch;
+            ex.fetch = customFetch;
+
+            const rates = await ex.fetch(sym, 1000);
+            ex.fetch = originalFetch; // restaura
+
+            if (!rates.length) {
+                alert(`Nenhum dado retornado para ${ex.label}.`);
+                return;
+            }
+
+            // Salva no IndexedDB
+            await saveRates(rates);
+            updateProgress(100);
+
+            // Atualiza lista
+            await refreshDataList();
+
+        } catch (err) {
+            alert(`Erro ao baixar ${ex.label}: ${err.message}`);
+            console.error(err);
+        } finally {
+            btn.disabled = false;
+            progressContainer.classList.remove('active');
+            progressBar.style.width = '0%';
+        }
+    }
+
+    // ========================================================================
+    //  EXPORTAÇÃO CONSOLIDADA (CSV)
+    // ========================================================================
+    async function exportConsolidated() {
+        const all = await getAllRates();
+        if (!all.length) {
+            alert('Não há dados para exportar.');
+            return;
+        }
+        // Converte para array de objetos simples
+        const rows = all.map(r => ({
+            exchange: r.exchange,
+            symbol: r.symbol,
+            timestamp: r.timestamp.toISOString(),
+            fundingRate: r.rate,
+        }));
+
+        // Usa Papa Parse para gerar CSV (carregamos dinamicamente)
+        if (typeof Papa === 'undefined') {
+            // Carrega Papa Parse via CDN
+            await loadPapaParse();
+        }
+        const csv = Papa.unparse(rows);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `funding_rates_consolidado_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+
+    function loadPapaParse() {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    // ========================================================================
+    //  EVENTOS E INICIALIZAÇÃO
+    // ========================================================================
+    document.addEventListener('DOMContentLoaded', async () => {
+        await openDB();
+        renderExchangeCards();
+        await refreshDataList();
+
+        // Filtros
+        applyBtn.addEventListener('click', refreshDataList);
+        clearBtn.addEventListener('click', () => {
+            symbolFilter.value = '';
+            dateFrom.value = '';
+            dateTo.value = '';
+            refreshDataList();
+        });
+
+        // Exportar
+        exportBtn.addEventListener('click', exportConsolidated);
+
+        // Limpar tudo
+        clearAllBtn.addEventListener('click', async () => {
+            if (!confirm('Tem certeza que deseja apagar todos os dados armazenados?')) return;
+            await clearAllRates();
+            await refreshDataList();
+        });
+
+        // Atualiza a lista sempre que mudar os filtros (opcional)
+        symbolFilter.addEventListener('change', refreshDataList);
+        dateFrom.addEventListener('change', refreshDataList);
+        dateTo.addEventListener('change', refreshDataList);
+    });
+
+    // ========================================================================
+    //  FALLBACK PARA PAPA PARSE (já incluso no carregamento)
+    // ========================================================================
+    // Se Papa Parse não carregar, tentamos novamente no export
+    window.addEventListener('load', async () => {
+        if (typeof Papa === 'undefined') {
+            await loadPapaParse();
+        }
+    });
+</script>
+</body>
+</html>
