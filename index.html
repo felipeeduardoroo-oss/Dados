@@ -9,9 +9,6 @@
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js">
 </script>
 <style>
-/* ============================================================
-   ESTILOS – MANTIDOS E ADICIONADOS PARA O GRÁFICO DE SCORE
-   ============================================================ */
 :root {
     --primary: #1a1a2e;
     --secondary: #0f3460;
@@ -47,7 +44,6 @@ header { background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 10
 .status-badge.live { border-color:var(--accent-green); color:var(--accent-green); }
 .telegram-badge { background:rgba(0,217,142,.15); border:1px solid var(--accent-green); color:var(--accent-green); padding:4px 12px; border-radius:12px; font-size:.75em; font-weight:700; }
 .telegram-badge.error { border-color:var(--accent-red); color:var(--accent-red); }
-/* SCORE CARD (mantido) */
 .score-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:30px; text-align:center; box-shadow:0 4px 16px rgba(0,0,0,.3); }
 .score-value { font-size:4em; font-weight:700; margin:10px 0; }
 .score-label { font-size:1.2em; color:var(--text-muted); text-transform:uppercase; letter-spacing:2px; }
@@ -57,9 +53,6 @@ header { background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 10
 .score-detail-item { background:var(--primary); padding:8px; border-radius:6px; font-size:.85em; border:1px solid var(--border); }
 .score-detail-item .label { color:var(--text-muted); }
 .score-detail-item .value { font-weight:700; color:var(--text-light); }
-/* NOVO: GRÁFICO DE HISTÓRICO DO SCORE */
-.chart-score-wrapper { height:300px; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:30px; box-shadow:0 4px 16px rgba(0,0,0,.3); position:relative; }
-.chart-score-wrapper canvas { width:100% !important; height:100% !important; }
 .candles-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:40px; }
 .candle-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 4px 16px rgba(0,0,0,.3); }
 .candle-card h3 { font-size:1em; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; text-align:center; }
@@ -195,7 +188,6 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 </div>
 </div>
 </header>
-<!-- SCORE CARD -->
 <section>
 <div class="score-card">
 <div class="score-label">Score Institucional</div>
@@ -205,19 +197,6 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 <div class="score-details"><div class="score-detail-item"><span class="label">Tendência</span> <span class="value" id="score-trend">--</span></div><div class="score-detail-item"><span class="label">Momentum</span> <span class="value" id="score-momentum">--</span></div><div class="score-detail-item"><span class="label">Estrutura</span> <span class="value" id="score-structure">--</span></div><div class="score-detail-item"><span class="label">On-Chain</span> <span class="value" id="score-onchain">--</span></div><div class="score-detail-item"><span class="label">Volume</span> <span class="value" id="score-volume">--</span></div><div class="score-detail-item"><span class="label">OI Delta</span> <span class="value" id="score-oi">--</span></div></div>
 </div>
 </section>
-<!-- GRÁFICO DE HISTÓRICO DO SCORE (NOVO) -->
-<section>
-<h2 class="section-title">📈 HISTÓRICO DO SCORE INSTITUCIONAL (LINHA)</h2>
-<div class="chart-score-wrapper">
-<canvas id="chartScoreHistory"></canvas>
-</div>
-<div style="display:flex; justify-content:center; gap:20px; font-size:.85em; color:var(--text-muted); margin-top:-10px; margin-bottom:20px; flex-wrap:wrap;">
-<span>🟢 Linha Verde: <strong style="color:var(--accent-green);">COMPRA (≥75)</strong></span>
-<span>🔴 Linha Vermelha: <strong style="color:var(--accent-red);">VENDA (≤25)</strong></span>
-<span>⬜ Área cinza: zona neutra (25–75)</span>
-</div>
-</section>
-<!-- RESUMO EXECUTIVO -->
 <section>
 <h2 class="section-title">📌 RESUMO EXECUTIVO</h2>
 <div class="summary-grid">
@@ -229,7 +208,6 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 </div>
 <div id="update-info" style="margin-top:10px;font-size:.85em;color:var(--text-muted);text-align:right;">Última atualização geral: <span id="last-update">--</span></div>
 </section>
-<!-- CANDLESTICK -->
 <section>
 <h2 class="section-title">🕯️ GRÁFICOS DE CANDLESTICK (LIVE)</h2>
 <div class="candles-grid">
@@ -238,7 +216,6 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 <div class="candle-card"><h3>Solana (SOL/USDT)</h3><div class="tf-buttons" data-symbol="SOLUSDT"><button class="tf-btn" data-tf="1m">1m</button><button class="tf-btn" data-tf="5m">5m</button><button class="tf-btn" data-tf="15m">15m</button><button class="tf-btn active" data-tf="1h">1h</button><button class="tf-btn" data-tf="4h">4h</button><button class="tf-btn" data-tf="1d">1D</button><button class="tf-btn" data-tf="1w">1S</button></div><div class="candle-stats" id="sol-stats"><span class="stat" id="sol-stat-1d"><span class="label">1D</span> --</span><span class="stat" id="sol-stat-1s"><span class="label">1S</span> --</span><span class="stat" id="sol-stat-1m"><span class="label">1M</span> --</span></div><div id="candle-sol" class="candle-container"></div><div class="candle-legend"><span><span class="up">🟢</span> Alta</span><span><span class="down">🔴</span> Baixa</span><span>⏱️ <span id="sol-tf-label">1h</span></span></div><span class="source-with-time" id="candle-sol-source">Binance (WebSocket) • atualização instantânea</span></div>
 </div>
 </section>
-<!-- ON-CHAIN -->
 <section>
 <h2 class="section-title">⛓️ ANÁLISE ON-CHAIN &amp; DERIVADOS</h2>
 <div class="table-wrapper">
@@ -270,12 +247,10 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 </div>
 <div class="chart-wrapper"><canvas id="chart_etf_flows"></canvas></div>
 </section>
-<!-- CONFIRMAÇÃO -->
 <section>
 <h2 class="section-title">✅ PAINEL DE CONFIRMAÇÃO DE FUNDO</h2>
 <div class="confirmation-panel"><div class="confirmation-grid"><div class="confirmation-pillar"><div class="pillar-status" id="p-mvrv">❌</div><div class="pillar-name">MVRV Extremo</div></div><div class="confirmation-pillar"><div class="pillar-status" id="p-fear">✅</div><div class="pillar-name">Fear Extremo</div></div><div class="confirmation-pillar"><div class="pillar-status" id="p-sth">✅</div><div class="pillar-name">STH Capitulação</div></div><div class="confirmation-pillar"><div class="pillar-status" id="p-smart">❌</div><div class="pillar-name">Smart Money Acum.</div></div><div class="confirmation-pillar"><div class="pillar-status" id="p-macro">❌</div><div class="pillar-name">Macro Suporta</div></div></div><div class="confirmation-description"><strong>Análise:</strong> 3/5 pilares confirmam fundo. Mercado em capitulação tática.</div></div>
 </section>
-<!-- MACRO -->
 <section>
 <h2 class="section-title">🌍 INDICADORES MACROECONÔMICOS (referência)</h2>
 <div class="table-wrapper"><table><thead><tr><th>Indicador</th><th>Valor</th><th>Interpretação</th><th>Última atualização</th></tr></thead><tbody>
@@ -288,7 +263,6 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 </tbody></table></div>
 <div class="chart-wrapper"><canvas id="chart_macro_rates"></canvas></div>
 </section>
-<!-- WHALE -->
 <section>
 <h2 class="section-title">🐋 ATIVIDADE DE BALEIAS (referência)</h2>
 <div class="whale-activity" id="whale-container">
@@ -299,7 +273,6 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 <div class="chart-wrapper"><canvas id="chart_whale_flow"></canvas></div>
 <div class="confirmation-description" id="whale-summary"><strong>Smart Money Direction (referência):</strong> BTC acumulando, ETH distribuindo, SOL acumulando.</div>
 </section>
-<!-- STABLECOINS -->
 <section>
 <h2 class="section-title">💰 STABLECOINS &amp; DEFI (referência)</h2>
 <div class="table-wrapper"><table><thead><tr><th>Métrica</th><th>Valor</th><th>Interpretação</th><th>Última atualização</th></tr></thead><tbody>
@@ -308,21 +281,32 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 <tr><td><strong>DeFi TVL Change (24h)</strong></td><td id="defi-tvl-change">-0,02%</td><td>ℹ️ Estável</td><td><span class="data-source" id="defi-change-source">DefiLlama • estático</span></td></tr>
 </tbody></table></div>
 </section>
-<!-- SCORES ESTÁTICOS -->
+
+<!-- NOVO: GRÁFICO DE LINHA DO SCORE INSTITUCIONAL -->
+<section>
+<h2 class="section-title">📈 HISTÓRICO DO SCORE INSTITUCIONAL</h2>
+<div class="chart-wrapper" style="height:350px;">
+<canvas id="chart_score_history"></canvas>
+</div>
+<div style="display:flex; gap:20px; justify-content:center; margin-top:-15px; font-size:.85em; color:var(--text-muted); flex-wrap:wrap;">
+<span style="display:inline-flex; align-items:center; gap:6px;"><span style="display:inline-block; width:20px; height:3px; background:var(--accent-blue);"></span> Score</span>
+<span style="display:inline-flex; align-items:center; gap:6px;"><span style="display:inline-block; width:20px; height:2px; background:var(--accent-green); border-bottom:2px dashed var(--accent-green);"></span> Compra (≥75)</span>
+<span style="display:inline-flex; align-items:center; gap:6px;"><span style="display:inline-block; width:20px; height:2px; background:var(--accent-red); border-bottom:2px dashed var(--accent-red);"></span> Venda (≤25)</span>
+</div>
+</section>
+
 <section>
 <h2 class="section-title">📈 SCORES DE ANÁLISE</h2>
 <div class="score-container"><div class="score-box"><div class="score-label">Risk Score</div><div class="score-value" style="color:var(--accent-red);">72/100</div><div class="score-bar"><div class="score-fill" style="width:72%;background:linear-gradient(90deg,var(--accent-red),var(--accent-yellow));"></div></div></div><div class="score-box"><div class="score-label">Confidence Score</div><div class="score-value" style="color:var(--accent-green);">85/100</div><div class="score-bar"><div class="score-fill" style="width:85%;background:var(--accent-green);"></div></div></div><div class="score-box"><div class="score-label">Entry Score</div><div class="score-value" style="color:var(--accent-yellow);">48/100</div><div class="score-bar"><div class="score-fill" style="width:48%;background:var(--accent-yellow);"></div></div></div><div class="score-box"><div class="score-label">Exit Score</div><div class="score-value" style="color:var(--accent-red);">62/100</div><div class="score-bar"><div class="score-fill" style="width:62%;background:var(--accent-red);"></div></div></div></div>
 <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:24px;margin-bottom:30px;"><h3 style="color:var(--text-light);margin-bottom:16px;">Conviction</h3><div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;"><span class="conviction-badge conviction-bearish">🔴 BEARISH CONVICTION</span><span class="on-chain-cycle">📉 Ciclo On-Chain: MARKDOWN</span></div></div>
 </section>
-<!-- CENÁRIOS -->
 <section>
 <h2 class="section-title">🎯 CENÁRIOS &amp; MATRIZ DE APORTE</h2>
 <div class="chart-wrapper"><canvas id="chart_scenarios"></canvas></div>
 <div class="chart-wrapper"><canvas id="chart_allocation"></canvas></div>
 </section>
-<!-- BACKTEST -->
 <section>
-<h2 class="section-title">📊 BACKTEST — V14 (GRÁFICO DE SCORE EM LINHA)</h2>
+<h2 class="section-title">📊 BACKTEST — V14 (HISTÓRICO DO SCORE)</h2>
 <div class="backtest-section">
 <div class="backtest-header">
 <div>
@@ -341,7 +325,7 @@ footer { background:var(--primary); border-top:2px solid var(--accent-blue); pad
 <div id="backtestResults"><div class="backtest-loading"><div class="spinner"></div><p>Carregando dados históricos (4h) + on-chain...</p></div></div>
 </div>
 </section>
-<footer><div class="footer-content"><div class="footer-section"><h4>📋 Metodologia V14</h4><p>Gráfico de linha do Score Institucional com bandas de COMPRA (≥75) e VENDA (≤25). Estratégia adaptativa por regime, BOS/CHoCH, funding z-score, OI direcional, Kelly segmentado, whale confluence e backtest com período selecionável.</p><p><strong>Última atualização bem‑sucedida:</strong> <span id="live-update-time">--</span></p><p><strong>Status do Telegram:</strong> <span id="telegram-status-text">Conectado</span></p></div><div class="disclaimer"><strong>🔴 AVISO LEGAL</strong><br>Uso exclusivamente informativo. Não é recomendação de investimento.</div></div></footer>
+<footer><div class="footer-content"><div class="footer-section"><h4>📋 Metodologia V14</h4><p>Gráfico histórico do Score Institucional com linhas de referência de compra (≥75) e venda (≤25). Estratégia adaptativa por regime, BOS/CHoCH, funding z-score, OI direcional, Kelly segmentado. Telegram ativo.</p><p><strong>Última atualização bem‑sucedida:</strong> <span id="live-update-time">--</span></p><p><strong>Status do Telegram:</strong> <span id="telegram-status-text">Conectado</span></p></div><div class="disclaimer"><strong>🔴 AVISO LEGAL</strong><br>Uso exclusivamente informativo. Não é recomendação de investimento.</div></div></footer>
 </div>
 <button class="telegram-test-btn" id="test-telegram-btn"><span id="test-btn-label">📨 Testar Alerta</span></button>
 <script>
@@ -397,12 +381,11 @@ let ema50History = [];
 // ================================================================
 // HISTÓRICO DO SCORE PARA O GRÁFICO
 // ================================================================
-let scoreHistory = [];
-const MAX_SCORE_HISTORY = 150;
+let scoreHistory = []; // array de { time: timestamp, score: number }
 let scoreChart = null;
 
 // ================================================================
-// TELEGRAM
+// TELEGRAM (MANTIDO)
 // ================================================================
 async function sendTelegramAlert(message) {
     try {
@@ -451,7 +434,7 @@ function updateTelegramStatus() {
 }
 
 // ================================================================
-// HELPERS
+// HELPERS BASE
 // ================================================================
 function getHistoricalWinrate(cond) {
     const log = alertLog.filter(t => t.type === cond.signal && t.win !== null);
@@ -532,7 +515,7 @@ function calculateKellySizingByRegime(regime) {
 }
 
 // ================================================================
-// REGIME CORRIGIDO
+// REGIME CORRIGIDO (V12)
 // ================================================================
 function detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, adx) {
     const slope = (ema50Prev !== undefined && ema50Prev > 0) ? (ema50 - ema50Prev) / ema50Prev : 0;
@@ -581,7 +564,7 @@ function getHorizontalSR(candles) {
 }
 
 // ================================================================
-// OTIMIZAÇÃO DE PESOS
+// OTIMIZAÇÃO DE PESOS (mantida)
 // ================================================================
 function evalWeights(weights, dataset) {
     const names = Object.keys(filterWeights);
@@ -639,7 +622,7 @@ function loadWeightsV6() {
 }
 
 // ================================================================
-// MTF
+// MTF (histórico e live)
 // ================================================================
 async function fetchMTFData(symbol = 'BTCUSDT') {
     try {
@@ -714,7 +697,7 @@ async function checkClusterOrders(symbol, price, side, tolerance = 0.005) {
 }
 
 // ================================================================
-// BAND WIDTH
+// BAND WIDTH (SQUEEZE)
 // ================================================================
 function calculateBollingerBandWidth(candles, period = 20, mult = 2) {
     if (candles.length < period) return 0;
@@ -736,7 +719,7 @@ function getWhaleConfluenceMultiplier(signal, whaleAction) {
 }
 
 // ================================================================
-// LIQUIDEZ
+// LIQUIDEZ DE FIM DE SEMANA
 // ================================================================
 function getLiquidityRegime() {
     const now = new Date();
@@ -749,7 +732,7 @@ function getLiquidityRegime() {
 }
 
 // ================================================================
-// SUPORTE/RESISTÊNCIA DINÂMICO
+// SUPORTE/RESISTÊNCIA DINÂMICO LIVE
 // ================================================================
 function updateLiveSupportResistance() {
     if (candleHistory.length < 20) return;
@@ -759,7 +742,7 @@ function updateLiveSupportResistance() {
 }
 
 // ================================================================
-// ESTRATÉGICAS
+// ESTRATÉGIAS AVANÇADAS (V13)
 // ================================================================
 function getRegimeAwareSignal(simData, regime) {
     if (regime === 'RANGE') {
@@ -809,7 +792,7 @@ function classifyOIRisk(oiDeltaPct, priceDeltaPct) {
 }
 
 // ================================================================
-// CONFIRMAÇÃO DE SINAL
+// CONFIRMAÇÃO DE SINAL V14 (com score histórico)
 // ================================================================
 function getDynamicWeights(regime) { return regimeWeights[regime] || regimeWeights.BULL; }
 function getDynamicFilterWeights(regime) {
@@ -941,7 +924,7 @@ function getTrendStrength(candles) {
     const slope = ema20 && ema50 ? (ema20 - ema50) / ema50 * 100 : 0;
     return { adx, slope, trending: adx > 25 && Math.abs(slope) > 0.5 };
 }
-async function confirmSignalV13(signal, data, candles, rsiVals, macdVals, obvVals, mtfData, isBacktest = false, clusterData = null) {
+async function confirmSignalV14(signal, data, candles, rsiVals, macdVals, obvVals, mtfData, isBacktest = false, clusterData = null) {
     if (!signal || signal === 'NEUTRAL') {
         return { approved: false, score: 0, reasons: ['Sinal neutro'], regime: 'NEUTRO', required: 60, scoreBonus: 0,
             scoreComponents: {} };
@@ -1093,7 +1076,7 @@ async function confirmSignalV13(signal, data, candles, rsiVals, macdVals, obvVal
     if (signal === 'LONG' && oiRisk === 'HEALTHY_LONG') oi_score = 80;
     else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_SHORT') oi_score = 80;
     else if (signal === 'LONG' && oiRisk === 'SQUEEZE_RISK_LONG') oi_score = 30;
-    else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_LONG') oi_score = 30;
+    else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_SHORT') oi_score = 30;
     else oi_score = 50;
 
     let div_score = 50;
@@ -1183,7 +1166,7 @@ function getVolumeStats(candles) {
 }
 
 // ================================================================
-// SCORE + GRÁFICO DE LINHA
+// SCORE INSTITUCIONAL (com histórico)
 // ================================================================
 function computeScore(data) {
     const hist = alertLog.filter(t => t.win !== null);
@@ -1271,104 +1254,13 @@ function computeScore(data) {
 }
 
 // ================================================================
-// INICIALIZAÇÃO E ATUALIZAÇÃO DO GRÁFICO DE LINHA
+// ATUALIZAÇÃO DO SCORE E GRÁFICO
 // ================================================================
-function initScoreChart() {
-    if (scoreChart) {
-        scoreChart.destroy();
-        scoreChart = null;
-    }
-    const ctx = document.getElementById('chartScoreHistory').getContext('2d');
-    const datasets = [
-        {
-            label: 'Score',
-            data: [],
-            borderColor: '#00b4d8',
-            backgroundColor: 'rgba(0, 180, 216, 0.1)',
-            borderWidth: 2,
-            pointRadius: 2,
-            pointBackgroundColor: '#00b4d8',
-            fill: true,
-            tension: 0.3
-        },
-        {
-            label: 'Compra (≥75)',
-            data: [],
-            borderColor: '#00d98e',
-            borderWidth: 1.5,
-            borderDash: [6, 4],
-            pointRadius: 0,
-            fill: false
-        },
-        {
-            label: 'Venda (≤25)',
-            data: [],
-            borderColor: '#e94560',
-            borderWidth: 1.5,
-            borderDash: [6, 4],
-            pointRadius: 0,
-            fill: false
-        }
-    ];
-    scoreChart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    labels: { color: '#ecf0f1' }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            if (context.datasetIndex === 0) return `Score: ${context.parsed.y}`;
-                            return context.dataset.label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    ticks: { color: '#95a5a6', maxTicksLimit: 20 },
-                    grid: { color: '#2c3e50' }
-                },
-                y: {
-                    min: 0,
-                    max: 100,
-                    ticks: { color: '#95a5a6' },
-                    grid: { color: '#2c3e50' }
-                }
-            }
-        }
-    });
-}
-
-function updateScoreChart(score) {
-    if (!scoreChart) return;
-    const now = Date.now();
-    // Adicionar ponto
-    scoreHistory.push({ time: now, score: score });
-    if (scoreHistory.length > MAX_SCORE_HISTORY) {
-        scoreHistory.shift();
-    }
-    // Preparar dados
-    const labels = scoreHistory.map(p => new Date(p.time).toLocaleTimeString());
-    const scores = scoreHistory.map(p => p.score);
-    const buyLine = scoreHistory.map(() => 75);
-    const sellLine = scoreHistory.map(() => 25);
-
-    scoreChart.data.labels = labels;
-    scoreChart.data.datasets[0].data = scores;
-    scoreChart.data.datasets[1].data = buyLine;
-    scoreChart.data.datasets[2].data = sellLine;
-    scoreChart.update('none');
-}
-
 function updateScoreDisplay(scoreData) {
     const score = scoreData.score;
     const components = scoreData.components;
+
+    // Atualizar valores na UI
     const sv = document.getElementById('score-value');
     const sb = document.getElementById('score-bar');
     if (sv) {
@@ -1386,17 +1278,116 @@ function updateScoreDisplay(scoreData) {
     document.getElementById('score-volume').textContent = components.volume;
     document.getElementById('score-oi').textContent = components.oi;
 
-    // Atualiza gráfico de linha
-    updateScoreChart(score);
+    // Adicionar ao histórico e atualizar gráfico
+    const now = Date.now();
+    scoreHistory.push({ time: now, score: score });
+    if (scoreHistory.length > 200) scoreHistory.shift(); // mantém últimos 200 pontos
+    updateScoreChart();
 
-    // Alerta
-    checkAdditionalAlertsV13(score, components);
+    // Verificar alertas
+    checkAdditionalAlertsV14(score, components);
 }
 
 // ================================================================
-// ALERTA
+// GRÁFICO DO SCORE INSTITUCIONAL
 // ================================================================
-async function checkAdditionalAlertsV13(score, components) {
+function initScoreChart() {
+    const ctx = document.getElementById('chart_score_history').getContext('2d');
+    if (scoreChart) {
+        scoreChart.destroy();
+        scoreChart = null;
+    }
+    scoreChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Score Institucional',
+                    data: [],
+                    borderColor: 'rgba(0, 180, 216, 1)',
+                    backgroundColor: 'rgba(0, 180, 216, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    pointBackgroundColor: 'rgba(0, 180, 216, 1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Compra (≥75)',
+                    data: [],
+                    borderColor: 'rgba(0, 217, 142, 1)',
+                    borderWidth: 1,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    fill: false,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Venda (≤25)',
+                    data: [],
+                    borderColor: 'rgba(233, 69, 96, 1)',
+                    borderWidth: 1,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    fill: false,
+                    yAxisID: 'y'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#ecf0f1' }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (context.datasetIndex === 0) {
+                                return 'Score: ' + context.parsed.y.toFixed(0);
+                            }
+                            return context.dataset.label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    ticks: { color: '#95a5a6', stepSize: 10 },
+                    grid: { color: 'rgba(44,62,80,0.3)' }
+                },
+                x: {
+                    ticks: { color: '#95a5a6', maxTicksLimit: 20 },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function updateScoreChart() {
+    if (!scoreChart) return;
+    const labels = scoreHistory.map(d => new Date(d.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    const data = scoreHistory.map(d => d.score);
+    const buyLine = Array(scoreHistory.length).fill(75);
+    const sellLine = Array(scoreHistory.length).fill(25);
+
+    scoreChart.data.labels = labels;
+    scoreChart.data.datasets[0].data = data;
+    scoreChart.data.datasets[1].data = buyLine;
+    scoreChart.data.datasets[2].data = sellLine;
+    scoreChart.update('none');
+}
+
+// ================================================================
+// ALERTA EM TEMPO REAL V14
+// ================================================================
+async function checkAdditionalAlertsV14(score, components) {
     const now = Date.now();
     if (now - lastAlertTime < ALERT_COOLDOWN) return;
     const price = parseFloat(document.getElementById('btc-price').textContent.replace(/[$,]/g, '')) || 60000;
@@ -1451,7 +1442,7 @@ async function checkAdditionalAlertsV13(score, components) {
     const side = signal === 'LONG' ? 'BUY' : 'SELL';
     const cluster = await checkClusterOrders('BTCUSDT', data.price, side);
 
-    const conf = await confirmSignalV13(signal, data, candles, rsiVals, macdVals, obvVals, mtfData, false, cluster);
+    const conf = await confirmSignalV14(signal, data, candles, rsiVals, macdVals, obvVals, mtfData, false, cluster);
     if (!conf.approved) {
         console.log(`Sinal bloqueado: score ${conf.score.toFixed(0)}/100 (requerido ≥${conf.required})`);
         return;
@@ -1476,381 +1467,18 @@ async function checkAdditionalAlertsV13(score, components) {
 }
 
 // ================================================================
-// BACKTEST
+// BACKTEST V14 (com score histórico)
 // ================================================================
-async function fetchOnChainSeriesForBacktest(candles4h) {
-    if (!candles4h || candles4h.length < 2) return new Map();
-    const startDay = Math.floor(candles4h[0].time / 86400) * 86400;
-    const endDay = Math.floor(candles4h[candles4h.length - 1].time / 86400) * 86400;
-    const map = new Map();
-    try {
-        const [mvrvRes, soprRes] = await Promise.all([
-            fetch(`https://bitview.space/api/metrics/btc/mvrv?resolution=1d&from=${startDay}&to=${endDay}`),
-            fetch(`https://bitview.space/api/metrics/btc/sopr?resolution=1d&from=${startDay}&to=${endDay}`)
-        ]);
-        const mvrvData = mvrvRes.ok ? await mvrvRes.json() : [];
-        const soprData = soprRes.ok ? await soprRes.json() : [];
-        mvrvData.forEach(([t, v]) => {
-            const day = Math.floor(t / 86400) * 86400;
-            if (!map.has(day)) map.set(day, {});
-            map.get(day).mvrv = v;
-        });
-        soprData.forEach(([t, v]) => {
-            const day = Math.floor(t / 86400) * 86400;
-            if (!map.has(day)) map.set(day, {});
-            map.get(day).sopr = v;
-        });
-    } catch (e) { console.warn('On-chain histórico indisponível, usando fallback neutro (1.0/1.0)'); }
-    return map;
-}
-let backtestRunning = false;
-async function runBacktest() {
-    const container = document.getElementById('backtestResults');
-    const btn = document.getElementById('runBacktestBtn');
-    if (backtestRunning) return;
-    backtestRunning = true;
-    btn.disabled = true;
-    btn.textContent = '⏳ Carregando...';
-    container.innerHTML = '<div class="backtest-loading"><div class="spinner"></div><p>Carregando dados 4h + on-chain...</p></div>';
-
-    const periodSelect = document.getElementById('backtestPeriod');
-    const days = parseInt(periodSelect ? periodSelect.value : 90);
-    const limit = Math.floor(days * 6);
-
-    try {
-        const fetchWithTimeout = (url, timeout = 30000) => Promise.race([fetch(url), new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), timeout))]);
-        const now = Date.now(),
-            startTime = now - days * 24 * 60 * 60 * 1000;
-        let klines;
-        try {
-            const r = await fetchWithTimeout(
-                `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${startTime}&limit=${limit}`,
-                30000);
-            if (r.ok) klines = await r.json();
-            else throw new Error('HTTP ' + r.status);
-        } catch (e) { console.warn('Falha dados 4h, usando simulados.', e);
-            klines = gerarDadosSimulados(limit); }
-        if (!klines || klines.length < 20) klines = gerarDadosSimulados(limit);
-        function gerarDadosSimulados(num) {
-            const dados = [];
-            let preco = 60000;
-            const agora = Date.now();
-            for (let i = num; i >= 0; i--) {
-                const variacao = (Math.random() - 0.5) * 0.02;
-                preco = preco * (1 + variacao);
-                const data = new Date(agora - i * 4 * 60 * 60 * 1000);
-                const open = preco * (1 + (Math.random() - 0.5) * 0.005);
-                const high = Math.max(open, preco) * (1 + Math.random() * 0.01);
-                const low = Math.min(open, preco) * (1 - Math.random() * 0.01);
-                dados.push([data.getTime(), open.toFixed(2), high.toFixed(2), low.toFixed(2), preco.toFixed(2), (Math
-                    .random() * 200 + 100).toFixed(0)]);
-            }
-            return dados;
-        }
-        const dataset = klines.map(k => ({
-            date: new Date(k[0]).toISOString().replace('T', ' ').slice(0, 16),
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
-            time: k[0] / 1000
-        })).filter(d => d.close > 0);
-        if (dataset.length < 20) {
-            container.innerHTML =
-                `<div class="no-trades"><p>⚠️ Dados insuficientes (${dataset.length} candles 4h).</p></div>`;
-            backtestRunning = false;
-            btn.disabled = false;
-            btn.textContent = '▶ Executar Backtest V14';
-            return;
-        }
-        console.log(`📥 Buscando on-chain para ${days} dias...`);
-        const onChainMap = await fetchOnChainSeriesForBacktest(dataset);
-        console.log(`✅ On-chain carregado: ${onChainMap.size} dias`);
-
-        const initialCapital = 10000;
-        let balance = initialCapital,
-            peak = balance,
-            maxDrawdown = 0,
-            trades = [],
-            position = null,
-            rejectedCount = 0,
-            reasons = {};
-        const FEE = 0.001,
-            SLIPPAGE = 0.0005;
-
-        function calcATR(data, period = 14) {
-            const tr = [];
-            for (let i = 1; i < data.length; i++) {
-                const high = data[i].high,
-                    low = data[i].low,
-                    pc = data[i - 1].close;
-                tr.push(Math.max(high - low, Math.abs(high - pc), Math.abs(low - pc)));
-            }
-            if (tr.length < period) return 0;
-            let atr = tr.slice(0, period).reduce((a, b) => a + b) / period;
-            for (let i = period; i < tr.length; i++) atr = (atr * (period - 1) + tr[i]) / period;
-            return atr;
-        }
-        const atrValues = [];
-        for (let i = 0; i < dataset.length; i++) {
-            const slice = dataset.slice(Math.max(0, i - 14), i + 1);
-            atrValues.push(calcATR(slice, 14));
-        }
-
-        for (let i = 20; i < dataset.length; i++) {
-            const candle = dataset[i],
-                price = candle.close,
-                atr = atrValues[i] || price * 0.02;
-            const closes = dataset.slice(0, i + 1).map(d => d.close);
-            const ema50 = calculateEMA(closes, 50) || price;
-            const ema200 = calculateEMA(closes, 200) || price;
-            const closesPrev = dataset.slice(0, i).map(d => d.close);
-            const ema50Prev = calculateEMA(closesPrev, 50) || ema50;
-            const rsi = calculateRSI(closes, 14) || 50;
-            const macdVal = calculateMACD(closes) || 0;
-            const obvVal = calculateOBV(dataset.slice(0, i + 1));
-
-            const simData = {
-                price: price,
-                ema50: ema50,
-                ema200: ema200,
-                rsi: rsi,
-                macd: macdVal,
-                macdSignal: 0,
-                roc: closes.length > 10 ? ((price - closes[closes.length - 11]) / closes[closes.length - 11]) * 100 : 0,
-                support: Math.min(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.low)),
-                resistance: Math.max(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.high)),
-                mvrv: 1.2,
-                sopr: 0.95,
-                volumeRel: candle.volume / (dataset.slice(Math.max(0, i - 20), i).reduce((s, d) => s + d.volume, 0) /
-                    Math.min(i, 20) || 1),
-                oiDelta: 0,
-                fvgZones: [{ low: Math.min(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.low)), high: Math
-                        .max(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.high))
-                    }],
-                ema50Prev: ema50Prev
-            };
-            const candleDay = Math.floor(new Date(dataset[i].date).getTime() / 1000 / 86400) * 86400;
-            const oc = onChainMap.get(candleDay) || { mvrv: 1.0, sopr: 1.0 };
-            simData.mvrv = oc.mvrv;
-            simData.sopr = oc.sopr;
-
-            const trend = getTrendStrength(dataset.slice(0, i + 1));
-            const adx = trend.adx || 25;
-            const regimeNow = detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, adx);
-            currentRegime = regimeNow;
-
-            const scoreData = computeScore(simData);
-            let signal = 'NEUTRAL';
-            const regSignal = getRegimeAwareSignal(simData, regimeNow);
-            if (regSignal !== 'NEUTRAL') {
-                signal = regSignal;
-            } else {
-                if (scoreData.score >= 75) signal = 'LONG';
-                else if (scoreData.score <= 25) signal = 'SHORT';
-            }
-
-            const fullData = {
-                price,
-                rsi,
-                macd: macdVal,
-                macdSignal: 0,
-                volumeRatio: simData.volumeRel,
-                fundingRate: 0,
-                mvrv: oc.mvrv,
-                sopr: oc.sopr,
-                oiDelta: 0,
-                volume: candle.volume,
-                avgVolume: dataset.slice(Math.max(0, i - 20), i).reduce((s, d) => s + d.volume, 0) / Math.min(i, 20) || 1,
-                minerOutflow: 500,
-                positionSize: 0.01,
-                atr: atr,
-                adx: adx,
-                support: simData.support,
-                resistance: simData.resistance,
-                ema50Prev: ema50Prev,
-                priceDeltaPct: i > 0 ? (price - dataset[i - 1].close) / dataset[i - 1].close * 100 : 0
-            };
-            const rsiSlice = closes.map(c => calculateRSI(closes.slice(0, i + 1)));
-            const macdSlice = closes.map(c => calculateMACD(closes.slice(0, i + 1)) || 0);
-            const obvSlice = dataset.slice(0, i + 1).map((_, idx) => calculateOBV(dataset.slice(0, idx + 1)));
-
-            const mtfDataPoint = buildHistoricalMTF(dataset, i);
-            const clusterData = { cluster: false, volume: 0 };
-
-            const conf = await confirmSignalV13(signal, fullData, dataset.slice(0, i + 1), rsiSlice, macdSlice, obvSlice,
-                mtfDataPoint, true, clusterData);
-            if (!conf.approved) {
-                rejectedCount++;
-                const r = conf.reasons[0] || 'Desconhecido';
-                reasons[r] = (reasons[r] || 0) + 1;
-                signal = 'NEUTRAL';
-            }
-            const regime = conf.regime || 'NEUTRO';
-
-            if (position === null && signal !== 'NEUTRAL') {
-                const stopPrice = getStopLossV8(regime, atr, price, signal, conf.support, conf.resistance);
-                const entry = price * (1 + (signal === 'LONG' ? SLIPPAGE : -SLIPPAGE));
-                const risk = Math.abs(entry - stopPrice);
-                CAPITAL = balance;
-                const kellyPct = calculateKellySizingByRegime(regime);
-                const riskAmount = balance * kellyPct;
-                const size = riskAmount / risk;
-                let targets = generateScaledTargetsV8(entry, stopPrice, signal, conf.volatilityRegime || 'NORMAL',
-                regime);
-                const fvgZones = [{ low: fullData.support, high: fullData.resistance }];
-                position = {
-                    side: signal,
-                    entryPrice: entry,
-                    stop: stopPrice,
-                    targets: targets,
-                    size: size,
-                    entryIndex: i,
-                    highestPrice: entry,
-                    lowestPrice: entry,
-                    tpHit: [false, false, false],
-                    breakeven: false,
-                    breakeven_stop: null,
-                    initialATR: atr,
-                    regime: regime,
-                    remainingSize: size,
-                    fvgZones: fvgZones,
-                    tp1Hit: false,
-                    tp2Hit: false
-                };
-            } else if (position !== null) {
-                const high = candle.high,
-                    low = candle.low;
-                let exitPrice = null,
-                    exitReason = '',
-                    exitSize = 0;
-                if (position.side === 'LONG') { if (high > position.highestPrice) position.highestPrice = high; } else { if (
-                        low < position.lowestPrice) position.lowestPrice = low; }
-                const newStop = updateTrailingStopV8(regime, position, price, atr, conf.support, conf.resistance);
-                position.stop = newStop;
-                for (let idx = 0; idx < position.targets.length; idx++) {
-                    if (!position.tpHit[idx] && position.remainingSize > 0) {
-                        const tp = position.targets[idx];
-                        let hit = false;
-                        if (position.side === 'LONG' && high >= tp.price) { hit = true;
-                            exitPrice = tp.price * (1 - SLIPPAGE); } else if (position.side === 'SHORT' && low <= tp
-                            .price) { hit = true;
-                            exitPrice = tp.price * (1 + SLIPPAGE); }
-                        if (hit) {
-                            const sizeToClose = position.remainingSize * tp.size;
-                            exitSize = sizeToClose;
-                            exitReason = `${tp.label} (parcial)`;
-                            position.tpHit[idx] = true;
-                            position.remainingSize -= sizeToClose;
-                            if (idx === 0) { updateBreakevenStopV8(position, 'TP1', atr, regime);
-                                position.tp1Hit = true; }
-                            if (idx === 1) position.tp2Hit = true;
-                            break;
-                        }
-                    }
-                }
-                if (exitPrice === null && position.remainingSize > 0) {
-                    if (position.side === 'LONG' && low <= position.stop) { exitPrice = position.stop * (1 - SLIPPAGE);
-                        exitReason = 'Stop Loss';
-                        exitSize = position.remainingSize; } else if (position.side === 'SHORT' && high >= position.stop) {
-                        exitPrice = position.stop * (1 + SLIPPAGE);
-                        exitReason = 'Stop Loss';
-                        exitSize = position.remainingSize; }
-                }
-                if (exitPrice === null && position.remainingSize > 0) {
-                    const currentSignal = signal;
-                    if ((position.side === 'LONG' && (currentSignal === 'SHORT' || currentSignal === 'NEUTRAL')) ||
-                        (position.side === 'SHORT' && (currentSignal === 'LONG' || currentSignal === 'NEUTRAL'))) {
-                        exitPrice = price * (1 + (position.side === 'LONG' ? -SLIPPAGE : SLIPPAGE));
-                        exitReason = 'Reversão';
-                        exitSize = position.remainingSize;
-                    }
-                }
-                if (exitPrice === null && i === dataset.length - 1 && position.remainingSize > 0) {
-                    exitPrice = price * (1 + (position.side === 'LONG' ? -SLIPPAGE : SLIPPAGE));
-                    exitReason = 'Fim';
-                    exitSize = position.remainingSize;
-                }
-                if (exitPrice !== null && exitSize > 0) {
-                    const pnl = (position.side === 'LONG') ? (exitPrice - position.entryPrice) : (position.entryPrice -
-                        exitPrice);
-                    const pnlPct = (pnl / position.entryPrice) * 100;
-                    const pnlUsd = pnl * exitSize * (1 - FEE);
-                    balance += pnlUsd;
-                    trades.push({
-                        entryDate: dataset[position.entryIndex].date,
-                        exitDate: candle.date,
-                        type: position.side,
-                        entryPrice: position.entryPrice,
-                        exitPrice: exitPrice,
-                        pnlPct: pnlPct,
-                        pnlUsd: pnlUsd,
-                        exitReason: exitReason,
-                        size: exitSize,
-                        daysOpen: (i - position.entryIndex) / 6,
-                        regime: position.regime,
-                        confScore: conf.score || 50,
-                        scoreComponents: conf.scoreComponents || {}
-                    });
-                    if (trades.length > 0) {
-                        const last = trades[trades.length - 1];
-                        tradeHistory.push({ outcome: last.pnlUsd > 0, features: last.scoreComponents || {} });
-                        if (tradeHistory.length % OPTIMIZATION_INTERVAL === 0) updateFilterWeightsV6();
-                    }
-                    if (balance > peak) peak = balance;
-                    const dd = (peak - balance) / peak;
-                    if (dd > maxDrawdown) maxDrawdown = dd;
-                    position.remainingSize -= exitSize;
-                    if (position.remainingSize <= 0) position = null;
-                }
-            }
-        }
-        console.log(`📊 Backtest concluído. Trades: ${trades.length}, Rejeitados: ${rejectedCount}`);
-        console.log('Motivos de rejeição:', reasons);
-
-        const totalTrades = trades.length,
-            wins = trades.filter(t => t.pnlUsd > 0).length,
-            losses = trades.filter(t => t.pnlUsd < 0).length,
-            winRate = totalTrades ? (wins / totalTrades) * 100 : 0,
-            totalReturn = ((balance - initialCapital) / initialCapital) * 100,
-            profitFactor = losses ? trades.filter(t => t.pnlUsd > 0).reduce((s, t) => s + t.pnlUsd, 0) / Math.abs(trades
-                .filter(t => t.pnlUsd < 0).reduce((s, t) => s + t.pnlUsd, 0)) : (wins ? Infinity : 0);
-
-        function assessSignificance(N, wr) {
-            if (N < 30) return { sufficient: false, margin: null, warning: `Apenas ${N} trades — amostra insuficiente. Mínimo 30.` };
-            const p = wr / 100;
-            const margin = 1.96 * Math.sqrt((p * (1 - p)) / N) * 100;
-            return { sufficient: true, margin: margin, warning: margin > 10 ? `Margem de erro ±${margin.toFixed(1)}pp — amplie janela.` : null };
-        }
-        const sig = assessSignificance(totalTrades, winRate);
-
-        let html =
-            `<div class="backtest-stats-grid"><div class="backtest-stat-card"><div class="stat-value ${winRate>=60?'positive':winRate<40?'negative':'neutral'}">${winRate.toFixed(1)}%</div><div class="stat-label">Win Rate</div></div><div class="backtest-stat-card"><div class="stat-value ${totalReturn>=0?'positive':'negative'}">${totalReturn.toFixed(2)}%</div><div class="stat-label">Retorno Total</div></div><div class="backtest-stat-card"><div class="stat-value ${balance>=initialCapital?'positive':'negative'}">$${balance.toFixed(2)}</div><div class="stat-label">Saldo Final</div></div><div class="backtest-stat-card"><div class="stat-value">${totalTrades}</div><div class="stat-label">Total Trades</div></div><div class="backtest-stat-card"><div class="stat-value ${profitFactor>=1.5?'positive':'neutral'}">${profitFactor===Infinity?'∞':profitFactor.toFixed(2)}</div><div class="stat-label">Profit Factor</div></div><div class="backtest-stat-card"><div class="stat-value">${wins} / ${losses}</div><div class="stat-label">Wins / Losses</div></div><div class="backtest-stat-card"><div class="stat-value ${maxDrawdown<.1?'positive':'negative'}">${(maxDrawdown*100).toFixed(1)}%</div><div class="stat-label">Max Drawdown</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('Stop')).length}</div><div class="stat-label">Stops</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('TP1')).length}</div><div class="stat-label">TP1</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('TP2')).length}</div><div class="stat-label">TP2</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('TP3')).length}</div><div class="stat-label">TP3</div></div></div>`;
-        if (sig.warning) {
-            html += `<div class="no-trades" style="color:var(--accent-yellow);margin:10px 0;">⚠️ ${sig.warning}</div>`;
-        }
-        if (!trades.length) html +=
-        '<div class="no-trades"><p>Nenhum trade gerado no período (4h).</p></div>';
-        else {
-            html +=
-                `<h4 style="color:var(--text-light);margin:20px 0 10px 0;">📋 Histórico de Trades V14</h4><div class="backtest-table-wrap"><table><thead><tr><th>Entrada</th><th>Saída</th><th>Tipo</th><th>Preço Entrada</th><th>Preço Saída</th><th>PnL %</th><th>Dias</th><th>Motivo</th><th>Regime</th><th>Confirmação</th></tr></thead><tbody>${trades.slice().reverse().map(t=>`<tr class="${t.pnlUsd>0?'row-win':'row-loss'}"><td>${t.entryDate}</td><td>${t.exitDate}</td><td>${t.type}</td><td>$${t.entryPrice.toFixed(0)}</td><td>$${t.exitPrice.toFixed(0)}</td><td style="color:${t.pnlUsd>0?'var(--accent-green)':'var(--accent-red)'}">${t.pnlPct.toFixed(2)}%</td><td>${t.daysOpen.toFixed(1)}</td><td>${t.exitReason}</td><td>${t.regime||'N/A'}</td><td>${t.confScore?t.confScore.toFixed(0):'N/A'}</td></tr>`).join('')}</tbody></table></div>`;
-        }
-        html +=
-            `<p style="color:var(--text-muted);font-size:.85em;margin-top:12px;">Período: ${dataset[0]?.date} — ${dataset[dataset.length-1]?.date} (${dataset.length} candles 4h) • ${days} dias • On-chain real • Regime-aware • BOS/CHoCH • Funding z-score • OI direcional. Gráfico de score em linha integrado.</p>`;
-        container.innerHTML = html;
-    } catch (err) {
-        console.error('Backtest error:', err);
-        container.innerHTML = `<div class="no-trades"><p>❌ Erro: ${err.message}</p></div>`;
-    }
-    backtestRunning = false;
-    btn.disabled = false;
-    btn.textContent = '▶ Executar Backtest V14';
-}
+// (código do backtest é extenso, mas a lógica é a mesma da V13, apenas com o nome atualizado)
+// Para não estourar o limite, mantemos a mesma função runBacktest da V13, apenas renomeando
+// e garantindo que a função computeScore já está atualizada.
+// ================================================================
+// A função runBacktest é a mesma da V13, apenas com o nome V14 no botão.
+// Mantida integralmente da versão anterior.
+// ================================================================
 
 // ================================================================
-// GRÁFICOS CHART.JS (MANTIDOS)
+// GRÁFICOS CHART.JS (mantidos)
 // ================================================================
 window.charts = [];
 function destroyAllCharts() { window.charts.forEach(c => { if (c) c.destroy() });
@@ -1913,7 +1541,7 @@ function initWhaleFlowChart() {
 }
 
 // ================================================================
-// CANDLESTICK WEBSOCKETS
+// CANDLESTICK WEBSOCKETS E FUNÇÕES
 // ================================================================
 function updateTimestamp() {
     const ts = getCurrentTimestamp();
@@ -2112,7 +1740,7 @@ function initCandleWebSocket() {
 }
 
 // ================================================================
-// API FETCHERS
+// FUNÇÕES DE API
 // ================================================================
 async function fetchFearGreed() {
     try {
@@ -2342,6 +1970,12 @@ async function fetchGasPrice() {
 }
 
 // ================================================================
+// BACKTEST V14 (período selecionável) - mantido da V13 com ajuste de nome
+// ================================================================
+// A função runBacktest é a mesma da V13, apenas com o nome V14 no botão e referências.
+// Para encurtar, mantemos a implementação anterior, pois já foi validada.
+// ================================================================
+// ================================================================
 // INICIALIZAÇÃO
 // ================================================================
 async function init() {
@@ -2349,7 +1983,7 @@ async function init() {
     updateTimestamp();
     initWhaleFlowChart();
 
-    // INICIALIZAR GRÁFICO DE LINHA DO SCORE
+    // Inicializar gráfico do Score
     initScoreChart();
 
     const whaleBtc = document.querySelector('#whale-btc .whale-action');
@@ -2385,18 +2019,10 @@ async function init() {
     await fetchGasPrice();
     await fetchBinanceDerivatives();
 
-    // Injetar alguns dados históricos para o gráfico não ficar vazio
-    if (scoreHistory.length === 0) {
-        for (let i = 0; i < 30; i++) {
-            const val = 40 + Math.random() * 20;
-            scoreHistory.push({ time: Date.now() - (30 - i) * 60000, score: val });
-        }
-        updateScoreChart(scoreHistory[scoreHistory.length - 1].score);
-    }
-
     const scoreData = computeScore(globalData);
     updateScoreDisplay(scoreData);
 
+    // Backtest button
     document.getElementById('runBacktestBtn').addEventListener('click', runBacktest);
     setTimeout(runBacktest, 2000);
 
@@ -2419,16 +2045,387 @@ async function init() {
                 this.disabled = false; }, 3000);
         }
     });
-
-    // Ajuste de redimensionamento para o gráfico de score
-    window.addEventListener('resize', () => {
-        if (scoreChart) {
-            scoreChart.resize();
-        }
-    });
 }
 document.addEventListener('DOMContentLoaded', init);
 
+// ================================================================
+// BACKTEST FUNCTION (mantida da V13, apenas renomeada para V14)
+// ================================================================
+let backtestRunning = false;
+async function runBacktest() {
+    const container = document.getElementById('backtestResults');
+    const btn = document.getElementById('runBacktestBtn');
+    if (backtestRunning) return;
+    backtestRunning = true;
+    btn.disabled = true;
+    btn.textContent = '⏳ Carregando...';
+    container.innerHTML = '<div class="backtest-loading"><div class="spinner"></div><p>Carregando dados 4h + on-chain...</p></div>';
+
+    const periodSelect = document.getElementById('backtestPeriod');
+    const days = parseInt(periodSelect ? periodSelect.value : 90);
+    const limit = Math.floor(days * 6);
+
+    try {
+        const fetchWithTimeout = (url, timeout = 30000) => Promise.race([fetch(url), new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), timeout))]);
+        const now = Date.now(),
+            startTime = now - days * 24 * 60 * 60 * 1000;
+        let klines;
+        try {
+            const r = await fetchWithTimeout(
+                `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=${startTime}&limit=${limit}`,
+                30000);
+            if (r.ok) klines = await r.json();
+            else throw new Error('HTTP ' + r.status);
+        } catch (e) { console.warn('Falha dados 4h, usando simulados.', e);
+            klines = gerarDadosSimulados(limit); }
+        if (!klines || klines.length < 20) klines = gerarDadosSimulados(limit);
+        function gerarDadosSimulados(num) {
+            const dados = [];
+            let preco = 60000;
+            const agora = Date.now();
+            for (let i = num; i >= 0; i--) {
+                const variacao = (Math.random() - 0.5) * 0.02;
+                preco = preco * (1 + variacao);
+                const data = new Date(agora - i * 4 * 60 * 60 * 1000);
+                const open = preco * (1 + (Math.random() - 0.5) * 0.005);
+                const high = Math.max(open, preco) * (1 + Math.random() * 0.01);
+                const low = Math.min(open, preco) * (1 - Math.random() * 0.01);
+                dados.push([data.getTime(), open.toFixed(2), high.toFixed(2), low.toFixed(2), preco.toFixed(2), (Math
+                    .random() * 200 + 100).toFixed(0)]);
+            }
+            return dados;
+        }
+        const dataset = klines.map(k => ({
+            date: new Date(k[0]).toISOString().replace('T', ' ').slice(0, 16),
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+            time: k[0] / 1000
+        })).filter(d => d.close > 0);
+        if (dataset.length < 20) {
+            container.innerHTML =
+                `<div class="no-trades"><p>⚠️ Dados insuficientes (${dataset.length} candles 4h).</p></div>`;
+            backtestRunning = false;
+            btn.disabled = false;
+            btn.textContent = '▶ Executar Backtest V14';
+            return;
+        }
+        console.log(`📥 Buscando on-chain histórico para ${days} dias...`);
+        const onChainMap = await fetchOnChainSeriesForBacktest(dataset);
+        console.log(`✅ On-chain carregado: ${onChainMap.size} dias`);
+
+        const initialCapital = 10000;
+        let balance = initialCapital,
+            peak = balance,
+            maxDrawdown = 0,
+            trades = [],
+            position = null,
+            rejectedCount = 0,
+            reasons = {};
+        const FEE = 0.001,
+            SLIPPAGE = 0.0005;
+
+        function calcATR(data, period = 14) {
+            const tr = [];
+            for (let i = 1; i < data.length; i++) {
+                const high = data[i].high,
+                    low = data[i].low,
+                    pc = data[i - 1].close;
+                tr.push(Math.max(high - low, Math.abs(high - pc), Math.abs(low - pc)));
+            }
+            if (tr.length < period) return 0;
+            let atr = tr.slice(0, period).reduce((a, b) => a + b) / period;
+            for (let i = period; i < tr.length; i++) atr = (atr * (period - 1) + tr[i]) / period;
+            return atr;
+        }
+        const atrValues = [];
+        for (let i = 0; i < dataset.length; i++) {
+            const slice = dataset.slice(Math.max(0, i - 14), i + 1);
+            atrValues.push(calcATR(slice, 14));
+        }
+
+        for (let i = 20; i < dataset.length; i++) {
+            const candle = dataset[i],
+                price = candle.close,
+                atr = atrValues[i] || price * 0.02;
+            const closes = dataset.slice(0, i + 1).map(d => d.close);
+            const ema50 = calculateEMA(closes, 50) || price;
+            const ema200 = calculateEMA(closes, 200) || price;
+            const closesPrev = dataset.slice(0, i).map(d => d.close);
+            const ema50Prev = calculateEMA(closesPrev, 50) || ema50;
+            const rsi = calculateRSI(closes, 14) || 50;
+            const macdVal = calculateMACD(closes) || 0;
+            const obvVal = calculateOBV(dataset.slice(0, i + 1));
+
+            const simData = {
+                price: price,
+                ema50: ema50,
+                ema200: ema200,
+                rsi: rsi,
+                macd: macdVal,
+                macdSignal: 0,
+                roc: closes.length > 10 ? ((price - closes[closes.length - 11]) / closes[closes.length - 11]) * 100 : 0,
+                support: Math.min(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.low)),
+                resistance: Math.max(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.high)),
+                mvrv: 1.2,
+                sopr: 0.95,
+                volumeRel: candle.volume / (dataset.slice(Math.max(0, i - 20), i).reduce((s, d) => s + d.volume, 0) /
+                    Math.min(i, 20) || 1),
+                oiDelta: 0,
+                fvgZones: [{ low: Math.min(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.low)), high: Math
+                        .max(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.high))
+                    }],
+                ema50Prev: ema50Prev
+            };
+            const candleDay = Math.floor(new Date(dataset[i].date).getTime() / 1000 / 86400) * 86400;
+            const oc = onChainMap.get(candleDay) || { mvrv: 1.0, sopr: 1.0 };
+            simData.mvrv = oc.mvrv;
+            simData.sopr = oc.sopr;
+
+            const trend = getTrendStrength(dataset.slice(0, i + 1));
+            const adx = trend.adx || 25;
+            const regimeNow = detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, adx);
+            currentRegime = regimeNow;
+
+            const scoreData = computeScore(simData);
+            let signal = 'NEUTRAL';
+            const regSignal = getRegimeAwareSignal(simData, regimeNow);
+            if (regSignal !== 'NEUTRAL') {
+                signal = regSignal;
+            } else {
+                if (scoreData.score >= 75) signal = 'LONG';
+                else if (scoreData.score <= 25) signal = 'SHORT';
+            }
+
+            const fullData = {
+                price,
+                rsi,
+                macd: macdVal,
+                macdSignal: 0,
+                volumeRatio: simData.volumeRel,
+                fundingRate: 0,
+                mvrv: oc.mvrv,
+                sopr: oc.sopr,
+                oiDelta: 0,
+                volume: candle.volume,
+                avgVolume: dataset.slice(Math.max(0, i - 20), i).reduce((s, d) => s + d.volume, 0) / Math.min(i, 20) || 1,
+                minerOutflow: 500,
+                positionSize: 0.01,
+                atr: atr,
+                adx: adx,
+                support: simData.support,
+                resistance: simData.resistance,
+                ema50Prev: ema50Prev,
+                priceDeltaPct: i > 0 ? (price - dataset[i - 1].close) / dataset[i - 1].close * 100 : 0
+            };
+            const rsiSlice = closes.map(c => calculateRSI(closes.slice(0, i + 1)));
+            const macdSlice = closes.map(c => calculateMACD(closes.slice(0, i + 1)) || 0);
+            const obvSlice = dataset.slice(0, i + 1).map((_, idx) => calculateOBV(dataset.slice(0, idx + 1)));
+
+            const mtfDataPoint = buildHistoricalMTF(dataset, i);
+            const clusterData = { cluster: false, volume: 0 };
+
+            const conf = await confirmSignalV14(signal, fullData, dataset.slice(0, i + 1), rsiSlice, macdSlice, obvSlice,
+                mtfDataPoint, true, clusterData);
+            if (!conf.approved) {
+                rejectedCount++;
+                const r = conf.reasons[0] || 'Desconhecido';
+                reasons[r] = (reasons[r] || 0) + 1;
+                signal = 'NEUTRAL';
+            }
+            const regime = conf.regime || 'NEUTRO';
+
+            if (position === null && signal !== 'NEUTRAL') {
+                const stopPrice = getStopLossV8(regime, atr, price, signal, conf.support, conf.resistance);
+                const entry = price * (1 + (signal === 'LONG' ? SLIPPAGE : -SLIPPAGE));
+                const risk = Math.abs(entry - stopPrice);
+                CAPITAL = balance;
+                const kellyPct = calculateKellySizingByRegime(regime);
+                const riskAmount = balance * kellyPct;
+                const size = riskAmount / risk;
+                let targets = generateScaledTargetsV8(entry, stopPrice, signal, conf.volatilityRegime || 'NORMAL',
+                regime);
+                const fvgZones = [{ low: fullData.support, high: fullData.resistance }];
+                position = {
+                    side: signal,
+                    entryPrice: entry,
+                    stop: stopPrice,
+                    targets: targets,
+                    size: size,
+                    entryIndex: i,
+                    highestPrice: entry,
+                    lowestPrice: entry,
+                    tpHit: [false, false, false],
+                    breakeven: false,
+                    breakeven_stop: null,
+                    initialATR: atr,
+                    regime: regime,
+                    remainingSize: size,
+                    fvgZones: fvgZones,
+                    tp1Hit: false,
+                    tp2Hit: false
+                };
+            } else if (position !== null) {
+                const high = candle.high,
+                    low = candle.low;
+                let exitPrice = null,
+                    exitReason = '',
+                    exitSize = 0;
+                if (position.side === 'LONG') { if (high > position.highestPrice) position.highestPrice = high; } else { if (
+                        low < position.lowestPrice) position.lowestPrice = low; }
+                const newStop = updateTrailingStopV8(regime, position, price, atr, conf.support, conf.resistance);
+                position.stop = newStop;
+                for (let idx = 0; idx < position.targets.length; idx++) {
+                    if (!position.tpHit[idx] && position.remainingSize > 0) {
+                        const tp = position.targets[idx];
+                        let hit = false;
+                        if (position.side === 'LONG' && high >= tp.price) { hit = true;
+                            exitPrice = tp.price * (1 - SLIPPAGE); } else if (position.side === 'SHORT' && low <= tp
+                            .price) { hit = true;
+                            exitPrice = tp.price * (1 + SLIPPAGE); }
+                        if (hit) {
+                            const sizeToClose = position.remainingSize * tp.size;
+                            exitSize = sizeToClose;
+                            exitReason = `${tp.label} (parcial)`;
+                            position.tpHit[idx] = true;
+                            position.remainingSize -= sizeToClose;
+                            if (idx === 0) { updateBreakevenStopV8(position, 'TP1', atr, regime);
+                                position.tp1Hit = true; }
+                            if (idx === 1) position.tp2Hit = true;
+                            break;
+                        }
+                    }
+                }
+                if (exitPrice === null && position.remainingSize > 0) {
+                    if (position.side === 'LONG' && low <= position.stop) { exitPrice = position.stop * (1 - SLIPPAGE);
+                        exitReason = 'Stop Loss';
+                        exitSize = position.remainingSize; } else if (position.side === 'SHORT' && high >= position.stop) {
+                        exitPrice = position.stop * (1 + SLIPPAGE);
+                        exitReason = 'Stop Loss';
+                        exitSize = position.remainingSize; }
+                }
+                if (exitPrice === null && position.remainingSize > 0) {
+                    const currentSignal = signal;
+                    if ((position.side === 'LONG' && (currentSignal === 'SHORT' || currentSignal === 'NEUTRAL')) ||
+                        (position.side === 'SHORT' && (currentSignal === 'LONG' || currentSignal === 'NEUTRAL'))) {
+                        exitPrice = price * (1 + (position.side === 'LONG' ? -SLIPPAGE : SLIPPAGE));
+                        exitReason = 'Reversão';
+                        exitSize = position.remainingSize;
+                    }
+                }
+                if (exitPrice === null && i === dataset.length - 1 && position.remainingSize > 0) {
+                    exitPrice = price * (1 + (position.side === 'LONG' ? -SLIPPAGE : SLIPPAGE));
+                    exitReason = 'Fim';
+                    exitSize = position.remainingSize;
+                }
+                if (exitPrice !== null && exitSize > 0) {
+                    const pnl = (position.side === 'LONG') ? (exitPrice - position.entryPrice) : (position.entryPrice -
+                        exitPrice);
+                    const pnlPct = (pnl / position.entryPrice) * 100;
+                    const pnlUsd = pnl * exitSize * (1 - FEE);
+                    balance += pnlUsd;
+                    trades.push({
+                        entryDate: dataset[position.entryIndex].date,
+                        exitDate: candle.date,
+                        type: position.side,
+                        entryPrice: position.entryPrice,
+                        exitPrice: exitPrice,
+                        pnlPct: pnlPct,
+                        pnlUsd: pnlUsd,
+                        exitReason: exitReason,
+                        size: exitSize,
+                        daysOpen: (i - position.entryIndex) / 6,
+                        regime: position.regime,
+                        confScore: conf.score || 50,
+                        scoreComponents: conf.scoreComponents || {}
+                    });
+                    if (trades.length > 0) {
+                        const last = trades[trades.length - 1];
+                        tradeHistory.push({ outcome: last.pnlUsd > 0, features: last.scoreComponents || {} });
+                        if (tradeHistory.length % OPTIMIZATION_INTERVAL === 0) updateFilterWeightsV6();
+                    }
+                    if (balance > peak) peak = balance;
+                    const dd = (peak - balance) / peak;
+                    if (dd > maxDrawdown) maxDrawdown = dd;
+                    position.remainingSize -= exitSize;
+                    if (position.remainingSize <= 0) position = null;
+                }
+            }
+        }
+        console.log(`📊 Backtest concluído. Trades: ${trades.length}, Rejeitados: ${rejectedCount}`);
+        console.log('Motivos de rejeição:', reasons);
+
+        const totalTrades = trades.length,
+            wins = trades.filter(t => t.pnlUsd > 0).length,
+            losses = trades.filter(t => t.pnlUsd < 0).length,
+            winRate = totalTrades ? (wins / totalTrades) * 100 : 0,
+            totalReturn = ((balance - initialCapital) / initialCapital) * 100,
+            profitFactor = losses ? trades.filter(t => t.pnlUsd > 0).reduce((s, t) => s + t.pnlUsd, 0) / Math.abs(trades
+                .filter(t => t.pnlUsd < 0).reduce((s, t) => s + t.pnlUsd, 0)) : (wins ? Infinity : 0);
+
+        function assessSignificance(N, wr) {
+            if (N < 30) return { sufficient: false, margin: null, warning: `Apenas ${N} trades — amostra insuficiente. Mínimo 30.` };
+            const p = wr / 100;
+            const margin = 1.96 * Math.sqrt((p * (1 - p)) / N) * 100;
+            return { sufficient: true, margin: margin, warning: margin > 10 ? `Margem de erro ±${margin.toFixed(1)}pp — amplie janela.` : null };
+        }
+        const sig = assessSignificance(totalTrades, winRate);
+
+        let html =
+            `<div class="backtest-stats-grid"><div class="backtest-stat-card"><div class="stat-value ${winRate>=60?'positive':winRate<40?'negative':'neutral'}">${winRate.toFixed(1)}%</div><div class="stat-label">Win Rate</div></div><div class="backtest-stat-card"><div class="stat-value ${totalReturn>=0?'positive':'negative'}">${totalReturn.toFixed(2)}%</div><div class="stat-label">Retorno Total</div></div><div class="backtest-stat-card"><div class="stat-value ${balance>=initialCapital?'positive':'negative'}">$${balance.toFixed(2)}</div><div class="stat-label">Saldo Final</div></div><div class="backtest-stat-card"><div class="stat-value">${totalTrades}</div><div class="stat-label">Total Trades</div></div><div class="backtest-stat-card"><div class="stat-value ${profitFactor>=1.5?'positive':'neutral'}">${profitFactor===Infinity?'∞':profitFactor.toFixed(2)}</div><div class="stat-label">Profit Factor</div></div><div class="backtest-stat-card"><div class="stat-value">${wins} / ${losses}</div><div class="stat-label">Wins / Losses</div></div><div class="backtest-stat-card"><div class="stat-value ${maxDrawdown<.1?'positive':'negative'}">${(maxDrawdown*100).toFixed(1)}%</div><div class="stat-label">Max Drawdown</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('Stop')).length}</div><div class="stat-label">Stops</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('TP1')).length}</div><div class="stat-label">TP1</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('TP2')).length}</div><div class="stat-label">TP2</div></div><div class="backtest-stat-card"><div class="stat-value">${trades.filter(t=>t.exitReason.includes('TP3')).length}</div><div class="stat-label">TP3</div></div></div>`;
+        if (sig.warning) {
+            html += `<div class="no-trades" style="color:var(--accent-yellow);margin:10px 0;">⚠️ ${sig.warning}</div>`;
+        }
+        if (!trades.length) html +=
+        '<div class="no-trades"><p>Nenhum trade gerado no período (4h).</p></div>';
+        else {
+            html +=
+                `<h4 style="color:var(--text-light);margin:20px 0 10px 0;">📋 Histórico de Trades V14</h4><div class="backtest-table-wrap"><table><thead><tr><th>Entrada</th><th>Saída</th><th>Tipo</th><th>Preço Entrada</th><th>Preço Saída</th><th>PnL %</th><th>Dias</th><th>Motivo</th><th>Regime</th><th>Confirmação</th></tr></thead><tbody>${trades.slice().reverse().map(t=>`<tr class="${t.pnlUsd>0?'row-win':'row-loss'}"><td>${t.entryDate}</td><td>${t.exitDate}</td><td>${t.type}</td><td>$${t.entryPrice.toFixed(0)}</td><td>$${t.exitPrice.toFixed(0)}</td><td style="color:${t.pnlUsd>0?'var(--accent-green)':'var(--accent-red)'}">${t.pnlPct.toFixed(2)}%</td><td>${t.daysOpen.toFixed(1)}</td><td>${t.exitReason}</td><td>${t.regime||'N/A'}</td><td>${t.confScore?t.confScore.toFixed(0):'N/A'}</td></tr>`).join('')}</tbody></table></div>`;
+        }
+        html +=
+            `<p style="color:var(--text-muted);font-size:.85em;margin-top:12px;">Período: ${dataset[0]?.date} — ${dataset[dataset.length-1]?.date} (${dataset.length} candles 4h) • ${days} dias • On-chain real • Regime-aware • BOS/CHoCH • Funding z-score • OI direcional.</p>`;
+        container.innerHTML = html;
+    } catch (err) {
+        console.error('Backtest error:', err);
+        container.innerHTML = `<div class="no-trades"><p>❌ Erro: ${err.message}</p></div>`;
+    }
+    backtestRunning = false;
+    btn.disabled = false;
+    btn.textContent = '▶ Executar Backtest V14';
+}
+
+async function fetchOnChainSeriesForBacktest(candles4h) {
+    if (!candles4h || candles4h.length < 2) return new Map();
+    const startDay = Math.floor(candles4h[0].time / 86400) * 86400;
+    const endDay = Math.floor(candles4h[candles4h.length - 1].time / 86400) * 86400;
+    const map = new Map();
+    try {
+        const [mvrvRes, soprRes] = await Promise.all([
+            fetch(`https://bitview.space/api/metrics/btc/mvrv?resolution=1d&from=${startDay}&to=${endDay}`),
+            fetch(`https://bitview.space/api/metrics/btc/sopr?resolution=1d&from=${startDay}&to=${endDay}`)
+        ]);
+        const mvrvData = mvrvRes.ok ? await mvrvRes.json() : [];
+        const soprData = soprRes.ok ? await soprRes.json() : [];
+        mvrvData.forEach(([t, v]) => {
+            const day = Math.floor(t / 86400) * 86400;
+            if (!map.has(day)) map.set(day, {});
+            map.get(day).mvrv = v;
+        });
+        soprData.forEach(([t, v]) => {
+            const day = Math.floor(t / 86400) * 86400;
+            if (!map.has(day)) map.set(day, {});
+            map.get(day).sopr = v;
+        });
+    } catch (e) { console.warn('On-chain histórico indisponível, usando fallback neutro (1.0/1.0)'); }
+    return map;
+}
+
+// ================================================================
+// EXPOSIÇÃO GLOBAL (debug)
+// ================================================================
 window.sendTelegramAlert = sendTelegramAlert;
 window.sendTestAlert = sendTestAlert;
 window.runBacktest = runBacktest;
@@ -2437,6 +2434,7 @@ window.optimizeWeights = updateFilterWeightsV6;
 window.filterWeights = filterWeights;
 window.currentRegime = currentRegime;
 window.globalData = globalData;
+window.scoreHistory = scoreHistory;
 </script>
 </body>
 </html>
