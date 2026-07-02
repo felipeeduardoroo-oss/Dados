@@ -1010,6 +1010,10 @@ function updateScoreDisplay(scoreData) {
 
 
     checkAdditionalAlertsV13(score, components);
+    
+    // Atualiza painéis dependentes do score
+    updateConfirmationPanel();
+    updateAnalysisScores();
 }
 
 
@@ -1106,6 +1110,68 @@ document.addEventListener('click', function(e) {
     currentScoreTimeframe = btn.dataset.tf;
     updateScoreChart();
 });
+
+
+// ================================================================
+// NOVAS FUNÇÕES: PAINEL DE CONFIRMAÇÃO E SCORES DE ANÁLISE
+// ================================================================
+function updateConfirmationPanel() {
+    // Pega dados atuais
+    const mvrv = globalData.mvrv || 1.2;
+    const fearGreedText = document.getElementById('header-fng')?.textContent || '';
+    const fearGreedMatch = fearGreedText.match(/\d+/);
+    const fearGreed = fearGreedMatch ? parseInt(fearGreedMatch[0]) : 50;
+    const sthEl = document.getElementById('mvrv-sth');
+    const sth = sthEl ? parseFloat(sthEl.textContent.replace(',', '.')) : 0.84;
+
+
+    // Atualiza os ícones
+    document.getElementById('p-mvrv').textContent = mvrv < 0.85 ? '✅' : '❌';
+    document.getElementById('p-fear').textContent = fearGreed <= 25 ? '✅' : '❌';
+    document.getElementById('p-sth').textContent = sth < 1.0 ? '✅' : '❌';
+    document.getElementById('p-smart').textContent = currentWhaleState === 'accumulating' ? '✅' : '❌';
+    // Macro permanece como referência (não alterado)
+}
+
+
+function updateAnalysisScores() {
+    const score = parseInt(document.getElementById('score-value')?.textContent) || 50;
+    const rsi = globalData.rsi || 50;
+
+
+    // Risk Score: quanto maior o score, menor o risco
+    const risk = Math.min(100, Math.max(0, 100 - score));
+    // Confidence: igual ao score
+    const confidence = score;
+    // Entry Score: score + bônus se alinhado com RSI
+    let entry = score;
+    if (score > 75 && rsi < 70) entry = Math.min(100, entry + 10);
+    else if (score < 25 && rsi > 30) entry = Math.min(100, entry + 10);
+    // Exit Score: baseado no RSI (quanto maior o RSI, maior tendência de saída)
+    let exit = 50;
+    if (rsi > 70) exit = 80;
+    else if (rsi < 30) exit = 20;
+    else exit = 50 + (rsi - 50) * 0.5;
+    exit = Math.min(100, Math.max(0, exit));
+
+
+    // Seleciona os elementos de score (ordem: Risk, Confidence, Entry, Exit)
+    const scoreValues = document.querySelectorAll('.score-box .score-value');
+    if (scoreValues.length >= 4) {
+        scoreValues[0].textContent = risk + '/100';
+        scoreValues[1].textContent = confidence + '/100';
+        scoreValues[2].textContent = entry + '/100';
+        scoreValues[3].textContent = exit + '/100';
+        // Ajusta cores (opcional)
+        const colors = [
+            risk > 70 ? 'var(--accent-red)' : 'var(--accent-yellow)',
+            confidence > 70 ? 'var(--accent-green)' : 'var(--accent-yellow)',
+            entry > 70 ? 'var(--accent-green)' : 'var(--accent-yellow)',
+            exit > 70 ? 'var(--accent-red)' : 'var(--accent-yellow)'
+        ];
+        scoreValues.forEach((el, idx) => el.style.color = colors[idx]);
+    }
+}
 
 
 // ================================================================
@@ -1934,6 +2000,9 @@ async function fetchFearGreed() {
         headerSentiment.textContent = sentimentText;
         headerSentiment.className = 'badge ' + (parseInt(value) <= 25 ? 'sentiment-bearish' : 'sentiment-bullish');
         updateLiveTime();
+        // Atualiza painéis após mudança no Fear
+        updateConfirmationPanel();
+        updateAnalysisScores();
     } catch (e) { console.warn('FNG unavailable'); }
 }
 async function fetchDeFiData() {
@@ -2071,6 +2140,9 @@ async function fetchBinanceDerivatives() {
         updateLiveTime();
         const scoreData = computeScore(globalData);
         updateScoreDisplay(scoreData);
+        // Atualiza painéis após dados de derivativos
+        updateConfirmationPanel();
+        updateAnalysisScores();
     } catch (e) { console.warn('Binance derivatives unavailable'); }
 }
 async function fetchBRK() {
@@ -2109,8 +2181,10 @@ async function fetchBRK() {
                     document.getElementById(m.interp).textContent = text;
                 }
                 updateSourceTimestamp(m.source);
-                if (m.id === 'mvrv') globalData.mvrv = parseFloat(val);
+                if (m.id === 'mvrv') { globalData.mvrv = parseFloat(val);
+                    updateConfirmationPanel(); }
                 if (m.id === 'sopr') globalData.sopr = parseFloat(val);
+                if (m.id === 'mvrv_short') updateConfirmationPanel(); // STH atualizado
             }
         } catch (e) { console.warn('BRK error for ' + m.id, e); }
     }));
@@ -2182,6 +2256,9 @@ async function init() {
         const whaleBtc2 = document.querySelector('#whale-btc .whale-action');
         if (whaleBtc2) currentWhaleState = whaleBtc2.textContent.trim().toLowerCase().includes('acumulando') ?
             'accumulating' : 'distributing';
+        // Atualiza painéis após cada ciclo
+        updateConfirmationPanel();
+        updateAnalysisScores();
     }, 300000);
 
 
@@ -2221,6 +2298,11 @@ async function init() {
                 this.disabled = false; }, 3000);
         }
     });
+
+
+    // Atualiza painéis ao carregar
+    updateConfirmationPanel();
+    updateAnalysisScores();
 }
 document.addEventListener('DOMContentLoaded', init);
 
