@@ -211,6 +211,22 @@ function updateRegimeDisplay(regime) {
 }
 
 
+/**
+ * Atualiza o regime atual com base no preço e histórico de candles.
+ * Deve ser chamado antes de qualquer cálculo de score ou decisão de sinal.
+ */
+function refreshCurrentRegime(price, candleHistory) {
+    const closes = candleHistory.map(c => c.close);
+    const ema50 = calculateEMA(closes, 50) || price;
+    const ema200 = calculateEMA(closes, 200) || price;
+    const ema50Prev = ema50History.length >= 2 ? ema50History[ema50History.length - 2] : ema50;
+    const trend = getTrendStrength(candleHistory);
+    const regime = detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, trend.adx || 25);
+    updateRegimeDisplay(regime);
+    return regime;
+}
+
+
 // ================================================================
 // CHOPPINESS
 // ================================================================
@@ -878,19 +894,6 @@ function getVolumeStats(candles) {
 // ================================================================
 // SCORE INSTITUCIONAL (COM ATUALIZAÇÃO DE REGIME EM TEMPO REAL)
 // ================================================================
-function refreshCurrentRegime(price, candleHistory) {
-    const closes = candleHistory.map(c => c.close);
-    const ema50 = calculateEMA(closes, 50) || price;
-    const ema200 = calculateEMA(closes, 200) || price;
-    const ema50Prev = ema50History.length >= 2 ? ema50History[ema50History.length - 2] : ema50;
-    const trend = getTrendStrength(candleHistory);
-    const regime = detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, trend.adx || 25);
-    updateRegimeDisplay(regime);
-    currentRegime = regime;
-    return regime;
-}
-
-
 function computeScore(data) {
     const hist = alertLog.filter(t => t.win !== null);
     if (hist.length > 20) {
@@ -1056,7 +1059,6 @@ const thresholdPlugin = {
 function initScoreChart() {
     const canvas = document.getElementById('scoreHistoryChart');
     if (!canvas) return;
-    // Plugin é passado apenas para esta instância, não registrado globalmente
     scoreChart = new Chart(canvas, {
         type: 'line',
         data: { datasets: [{ label: 'Score Institucional', data: [], borderColor: '#00b4d8',
@@ -1077,7 +1079,7 @@ function initScoreChart() {
             },
             elements: { line: { tension: 0.3 } }
         },
-        plugins: [thresholdPlugin] // plugin local
+        plugins: [thresholdPlugin]
     });
     updateScoreChart();
 }
@@ -1116,7 +1118,6 @@ document.addEventListener('click', function(e) {
 // NOVAS FUNÇÕES: PAINEL DE CONFIRMAÇÃO E SCORES DE ANÁLISE
 // ================================================================
 function updateConfirmationPanel() {
-    // Pega dados atuais
     const mvrv = globalData.mvrv || 1.2;
     const fearGreedText = document.getElementById('header-fng')?.textContent || '';
     const fearGreedMatch = fearGreedText.match(/\d+/);
@@ -1125,12 +1126,10 @@ function updateConfirmationPanel() {
     const sth = sthEl ? parseFloat(sthEl.textContent.replace(',', '.')) : 0.84;
 
 
-    // Atualiza os ícones
     document.getElementById('p-mvrv').textContent = mvrv < 0.85 ? '✅' : '❌';
     document.getElementById('p-fear').textContent = fearGreed <= 25 ? '✅' : '❌';
     document.getElementById('p-sth').textContent = sth < 1.0 ? '✅' : '❌';
     document.getElementById('p-smart').textContent = currentWhaleState === 'accumulating' ? '✅' : '❌';
-    // Macro permanece como referência (não alterado)
 }
 
 
@@ -1139,15 +1138,11 @@ function updateAnalysisScores() {
     const rsi = globalData.rsi || 50;
 
 
-    // Risk Score: quanto maior o score, menor o risco
     const risk = Math.min(100, Math.max(0, 100 - score));
-    // Confidence: igual ao score
     const confidence = score;
-    // Entry Score: score + bônus se alinhado com RSI
     let entry = score;
     if (score > 75 && rsi < 70) entry = Math.min(100, entry + 10);
     else if (score < 25 && rsi > 30) entry = Math.min(100, entry + 10);
-    // Exit Score: baseado no RSI (quanto maior o RSI, maior tendência de saída)
     let exit = 50;
     if (rsi > 70) exit = 80;
     else if (rsi < 30) exit = 20;
@@ -1155,14 +1150,12 @@ function updateAnalysisScores() {
     exit = Math.min(100, Math.max(0, exit));
 
 
-    // Seleciona os elementos de score (ordem: Risk, Confidence, Entry, Exit)
     const scoreValues = document.querySelectorAll('.score-box .score-value');
     if (scoreValues.length >= 4) {
         scoreValues[0].textContent = risk + '/100';
         scoreValues[1].textContent = confidence + '/100';
         scoreValues[2].textContent = entry + '/100';
         scoreValues[3].textContent = exit + '/100';
-        // Ajusta cores (opcional)
         const colors = [
             risk > 70 ? 'var(--accent-red)' : 'var(--accent-yellow)',
             confidence > 70 ? 'var(--accent-green)' : 'var(--accent-yellow)',
@@ -1175,11 +1168,12 @@ function updateAnalysisScores() {
 
 
 // ================================================================
-// ALERTA EM TEMPO REAL (CORRIGIDO: REGIME ATUALIZADO ANTES DO GATE)
+// ALERTA EM TEMPO REAL – CORRIGIDO: regime atualizado e lógica regime-aware
 // ================================================================
 async function checkAdditionalAlertsV13(score, components) {
     const now = Date.now();
     if (now - lastAlertTime < ALERT_COOLDOWN) return;
+    
     const price = parseFloat(document.getElementById('btc-price').textContent.replace(/[$,]/g, '')) || 60000;
     const fundingRateEl = document.getElementById('funding-rate');
     const fundingRate = fundingRateEl ? parseFloat(fundingRateEl.textContent.replace('%', '')) / 100 : 0;
@@ -1187,36 +1181,22 @@ async function checkAdditionalAlertsV13(score, components) {
     const mvrv = mvrvEl ? parseFloat(mvrvEl.textContent) : 1.2;
     const soprEl = document.getElementById('sopr');
     const sopr = soprEl ? parseFloat(soprEl.textContent) : 0.95;
+    
     let data = {
         price, rsi: 50, macd: 0, macdSignal: 0, volumeRatio: 1, fundingRate, mvrv, sopr,
         support: 58000, resistance: 70000, atr: price * 0.02,
         oiDelta: globalData.oiDelta || 0, volume: 0, avgVolume: 0,
         minerOutflow: 500, positionSize: 0.01, adx: 25
     };
-    // --- CORREÇÃO: atualiza o regime ANTES de qualquer decisão de sinal ---
+
+
+    // 1. Atualiza regime ANTES de qualquer decisão
     refreshCurrentRegime(price, candleHistory);
     const regimeLive = currentRegime;
 
 
-    // Sinal: prioriza regime-aware, fallback para score
-    const regSignalLive = getRegimeAwareSignal(data, regimeLive);
-    let signal = null;
-    if (regSignalLive !== 'NEUTRAL') {
-        signal = regSignalLive;
-    } else {
-        if (score >= 75) signal = 'LONG';
-        else if (score <= 25) signal = 'SHORT';
-    }
-    if (!signal) return;
-
-
-    const mtfData = await fetchMTFData('BTCUSDT');
+    // 2. Obtém dados atualizados de suporte/resistência, volume, etc.
     const candles = candleHistory.length > 0 ? candleHistory : [];
-    const rsiVals = rsiHistory.length > 0 ? rsiHistory : [];
-    const macdVals = macdHistory.length > 0 ? macdHistory : [];
-    const obvVals = obvHistory.length > 0 ? obvHistory : [];
-
-
     const dynamic = getDynamicLevels(candles);
     const volStats = getVolumeStats(candles);
     data.support = dynamic.support;
@@ -1237,6 +1217,27 @@ async function checkAdditionalAlertsV13(score, components) {
     data.ema50Prev = ema50PrevLive;
     data.priceDeltaPct = closesLive.length > 1 ? (price - closesLive[closesLive.length - 2]) / closesLive[closesLive
         .length - 2] * 100 : 0;
+    data.ema50 = ema50Live;
+    data.rsi = globalData.rsi || 50;
+
+
+    // 3. Define sinal: prioriza lógica regime-aware, fallback para score
+    let signal = null;
+    const regSignalLive = getRegimeAwareSignal(data, regimeLive);
+    if (regSignalLive !== 'NEUTRAL') {
+        signal = regSignalLive;
+    } else {
+        if (score >= 75) signal = 'LONG';
+        else if (score <= 25) signal = 'SHORT';
+    }
+    if (!signal) return;
+
+
+    // 4. Busca dados para confirmação (MTF, RSI/MACD/OBV, cluster)
+    const mtfData = await fetchMTFData('BTCUSDT');
+    const rsiVals = rsiHistory.length > 0 ? rsiHistory : [];
+    const macdVals = macdHistory.length > 0 ? macdHistory : [];
+    const obvVals = obvHistory.length > 0 ? obvHistory : [];
 
 
     const side = signal === 'LONG' ? 'BUY' : 'SELL';
@@ -1250,7 +1251,6 @@ async function checkAdditionalAlertsV13(score, components) {
     }
 
 
-    // Aplica a confluência de baleias ao tamanho da posição (corrigido)
     const whaleMult = getWhaleConfluenceMultiplier(signal, currentWhaleState);
 
 
@@ -1265,8 +1265,6 @@ async function checkAdditionalAlertsV13(score, components) {
     let targets = generateScaledTargetsV8(price, stop, signal, conf.volatilityRegime || 'NORMAL', regime);
     let finalScore = score + conf.scoreBonus;
     finalScore = Math.min(100, Math.max(0, finalScore));
-    // Aplica o multiplicador de baleia ao tamanho sugerido na mensagem
-    const adjustedSize = whaleMult;
     const rationale =
         `Filtros V13: ${conf.score.toFixed(0)}/100 score. Regime: ${regime}. Vol: ${conf.volatilityRegime}. Whale confluence: ${whaleMult.toFixed(2)}x. MTF: ${conf.reasons[4]}`;
     await sendStructuredAlert(signal, finalScore, price, stop, targets, rationale, components);
@@ -1275,7 +1273,7 @@ async function checkAdditionalAlertsV13(score, components) {
 
 
 // ================================================================
-// BACKTEST V13 (CORRIGIDO: RSI/MACD PROGRESSIVOS, FUNDING HISTÓRICO)
+// BACKTEST V13 – CORRIGIDO: RSI/MACD progressivos, funding histórico real
 // ================================================================
 async function fetchOnChainSeriesForBacktest(candles4h) {
     if (!candles4h || candles4h.length < 2) return new Map();
@@ -1304,7 +1302,40 @@ async function fetchOnChainSeriesForBacktest(candles4h) {
 }
 
 
-// Função auxiliar para construir séries progressivas de RSI/MACD (corrige bug de índice)
+/**
+ * Busca funding rate histórico real da Binance para o período do backtest.
+ */
+async function fetchFundingHistoryForBacktest(startTimeMs, endTimeMs) {
+    const map = new Map();
+    try {
+        const r = await fetch(
+            `https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&startTime=${startTimeMs}&endTime=${endTimeMs}&limit=1000`
+        );
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        data.forEach(item => {
+            map.set(item.fundingTime, parseFloat(item.fundingRate));
+        });
+    } catch (e) {
+        console.warn('Funding histórico indisponível para backtest, filtro ficará neutro:', e);
+    }
+    return map;
+}
+
+
+function getFundingAtTime(fundingMap, candleTimeMs) {
+    let closest = 0;
+    for (const [ts, rate] of fundingMap) {
+        if (ts <= candleTimeMs) closest = rate;
+        else break;
+    }
+    return closest;
+}
+
+
+/**
+ * Gera séries progressivas de RSI e MACD (uma por candle).
+ */
 function buildIndicatorSeries(closes) {
     const rsiSlice = closes.map((_, idx) => calculateRSI(closes.slice(0, idx + 1)));
     const macdSlice = closes.map((_, idx) => calculateMACD(closes.slice(0, idx + 1)) || 0);
@@ -1381,29 +1412,9 @@ async function runBacktest() {
         console.log(`✅ On-chain carregado: ${onChainMap.size} dias`);
 
 
-        // Buscar funding histórico (corrige #4)
         console.log('📥 Buscando funding histórico...');
-        const fundingMap = new Map();
-        try {
-            const r = await fetchWithTimeout(
-                `https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&startTime=${startTime}&endTime=${now}&limit=1000`,
-                10000);
-            if (r.ok) {
-                const data = await r.json();
-                data.forEach(item => { fundingMap.set(item.fundingTime, parseFloat(item.fundingRate)); });
-                console.log(`✅ Funding histórico carregado: ${fundingMap.size} registros`);
-            }
-        } catch (e) { console.warn('Funding histórico indisponível, filtro ficará neutro:', e); }
-
-
-        function getFundingAtTime(fundingMap, candleTimeMs) {
-            let closest = 0;
-            for (const [ts, rate] of fundingMap) {
-                if (ts <= candleTimeMs) closest = rate;
-                else break;
-            }
-            return closest;
-        }
+        const fundingMap = await fetchFundingHistoryForBacktest(startTime, now);
+        console.log(`✅ Funding carregado: ${fundingMap.size} registros`);
 
 
         const initialCapital = 10000;
@@ -1449,7 +1460,6 @@ async function runBacktest() {
             const ema50Prev = calculateEMA(closesPrev, 50) || ema50;
             const rsi = calculateRSI(closes, 14) || 50;
             const macdVal = calculateMACD(closes) || 0;
-            const obvVal = calculateOBV(dataset.slice(0, i + 1));
 
 
             // --- CORREÇÃO #3: séries progressivas de RSI/MACD ---
@@ -1480,7 +1490,7 @@ async function runBacktest() {
                         .max(...dataset.slice(Math.max(0, i - 20), i + 1).map(d => d.high))
                     }],
                 ema50Prev: ema50Prev,
-                fundingRate: fundingRate // agora real
+                fundingRate: fundingRate
             };
             const candleDay = Math.floor(new Date(dataset[i].date).getTime() / 1000 / 86400) * 86400;
             const oc = onChainMap.get(candleDay) || { mvrv: 1.0, sopr: 1.0 };
@@ -2000,7 +2010,6 @@ async function fetchFearGreed() {
         headerSentiment.textContent = sentimentText;
         headerSentiment.className = 'badge ' + (parseInt(value) <= 25 ? 'sentiment-bearish' : 'sentiment-bullish');
         updateLiveTime();
-        // Atualiza painéis após mudança no Fear
         updateConfirmationPanel();
         updateAnalysisScores();
     } catch (e) { console.warn('FNG unavailable'); }
@@ -2138,9 +2147,13 @@ async function fetchBinanceDerivatives() {
             }
         }
         updateLiveTime();
+
+
+        // === CORREÇÃO: atualiza o regime antes do computeScore ===
+        refreshCurrentRegime(globalData.price, candleHistory);
+        
         const scoreData = computeScore(globalData);
         updateScoreDisplay(scoreData);
-        // Atualiza painéis após dados de derivativos
         updateConfirmationPanel();
         updateAnalysisScores();
     } catch (e) { console.warn('Binance derivatives unavailable'); }
@@ -2184,7 +2197,7 @@ async function fetchBRK() {
                 if (m.id === 'mvrv') { globalData.mvrv = parseFloat(val);
                     updateConfirmationPanel(); }
                 if (m.id === 'sopr') globalData.sopr = parseFloat(val);
-                if (m.id === 'mvrv_short') updateConfirmationPanel(); // STH atualizado
+                if (m.id === 'mvrv_short') updateConfirmationPanel();
             }
         } catch (e) { console.warn('BRK error for ' + m.id, e); }
     }));
@@ -2256,7 +2269,6 @@ async function init() {
         const whaleBtc2 = document.querySelector('#whale-btc .whale-action');
         if (whaleBtc2) currentWhaleState = whaleBtc2.textContent.trim().toLowerCase().includes('acumulando') ?
             'accumulating' : 'distributing';
-        // Atualiza painéis após cada ciclo
         updateConfirmationPanel();
         updateAnalysisScores();
     }, 300000);
@@ -2300,7 +2312,6 @@ async function init() {
     });
 
 
-    // Atualiza painéis ao carregar
     updateConfirmationPanel();
     updateAnalysisScores();
 }
