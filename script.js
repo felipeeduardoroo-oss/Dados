@@ -1332,17 +1332,222 @@ function loadAlertLog() {
 }
 
 
+// ================================================================
+// MOTOR DE DADOS (O QUE ESTAVA FALTANDO NO ARQUIVO ORIGINAL)
+// ================================================================
 
+const CANDLE_INTERVALS = ['1m', '5m', '15m'];
+let candleCharts = { '1m': null, '5m': null, '15m': null };
+
+// Busca preço atual e variações na Binance
+async function fetchTickerData() {
+    try {
+        const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+        if (!r.ok) throw new Error('Erro HTTP: ' + r.status);
+        return await r.json();
+    } catch (e) {
+        console.warn('⚠️ Falha ao buscar ticker:', e);
+        return null;
+    }
+}
+
+// Busca velas (Klines) e atualiza o histórico
+async function fetchAndUpdateCandles(interval, limit = 100) {
+    try {
+        const data = await fetchCandles('BTCUSDT', interval, limit);
+        if (!data || data.length === 0) return;
+
+        if (interval === '1h') {
+            candleHistory = data;
+            // Atualiza EMA history para detecção de regime
+            const closes = data.map(c => c.close);
+            const ema50 = calculateEMA(closes, 50);
+            if (ema50) ema50History.push(ema50);
+            if (ema50History.length > 200) ema50History.shift();
+        }
+        
+        return data;
+    } catch (e) {
+        console.warn(`⚠️ Falha ao buscar candles ${interval}:`, e);
+        return null;
+    }
+}
+
+// Calcula indicadores e injeta no globalData
+function processIndicators() {
+    if (candleHistory.length < 50) return;
+
+    const closes = candleHistory.map(c => c.close);
+    const currentPrice = closes[closes.length - 1];
+    
+    globalData.price = currentPrice;
+    globalData.ema50 = calculateEMA(closes, 50) || currentPrice;
+    globalData.ema200 = calculateEMA(closes, 200) || currentPrice;
+    globalData.rsi = calculateRSI(closes, 14);
+    globalData.macd = calculateMACD(closes) || 0;
+    globalData.atr = calculateATR(closes);
+
+    // Atualiza suporte e resistência dinâmico
+    updateLiveSupportResistance();
+
+    // Atualiza regime atual
+    refreshCurrentRegime(currentPrice, candleHistory);
+}
+
+// Inicializa ou atualiza o gráfico de velas (Lightweight Charts)
+function renderCandleChart(interval, candles) {
+    if (typeof LightweightCharts === 'undefined') return;
+    
+    const containerId = `chart-${interval}`;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const chartData = candles.map(c => ({
+        time: Math.floor(c.time / 1000), // LightweightCharts usa segundos
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close
+    }));
+
+    if (!candleCharts[interval]) {
+        candleCharts[interval] = LightweightCharts.createChart(container, {
+            width: container.clientWidth,
+            height: 250,
+            layout: { background: { color: '#1a1a2e' }, textColor: '#95a5a6' },
+            grid: { vertLines: { color: '#2c3e50' }, horzLines: { color: '#2c3e50' } },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            timeScale: { timeVisible: true, secondsVisible: false },
+        });
+        const candleSeries = candleCharts[interval].addCandlestickSeries({
+            upColor: '#00d98e', downColor: '#e94560', borderDownColor: '#e94560',
+            borderUpColor: '#00d98e', wickDownColor: '#e94560', wickUpColor: '#00d98e'
+        });
+        candleSeries.setData(chartData);
+    } else {
+        // Atualiza apenas o último ponto para não re-desenhar tudo (performance)
+        const series = candleCharts[interval].seriesTypes?.['Candlestick'] || 
+                       candleCharts[interval].addCandlestickSeries; // Fallback simples
+        if (candleCharts[interval]._series) {
+            candleCharts[interval]._series.update(chartData[chartData.length - 1]);
+        }
+    }
+}
+
+// Atualiza os textos do Header (Preço, Change, etc)
+function updateHeaderUI(ticker) {
+    if (!ticker) return;
+    
+    const priceEl = document.getElementById('btc-price');
+    const changeEl = document.getElementById('btc-change');
+    
+    if (priceEl) priceEl.textContent = formatCurrency(parseFloat(ticker.lastPrice));
+    if (changeEl) {
+        const change = parseFloat(ticker.priceChangePercent);
+        changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+        changeEl.className = 'badge ' + (change >= 0 ? 'sentiment-bullish' : 'sentiment-bearish');
+    }
+}
+
+// O Loop Principal que roda a cada X segundos
+let isUpdating = false;
+async function mainLoop() {
+    if (isUpdating) return; // Evita sobreposição de chamadas
+    isUpdating = true;
+
+    try {
+        // 1. Busca Ticker (Preço atual)
+        const ticker = await fetchTickerData();
+        updateHeaderUI(ticker);
+
+        // 2. Busca candles principais (1h para indicadores)
+        const candles1h = await fetchAndUpdateCandles('1h', 100);
+        
+        if (candles1h && candles1h.length > 0) {
+            // 3. Calcula indicadores
+            processIndicators();
+
+            // 4. Calcula e renderiza o Score
+            const scoreData = computeScore(globalData);
+            updateScoreDisplay(scoreData);
+        }
+
+        // 5. Busca e renderiza velas dos cards menores (1m, 5m, 15m)
+        for (const interval of CANDLE_INTERVALS) {
+            const candles = await fetchAndUpdateCandles(interval, 50);
+            if (candles) renderCandleChart(interval, candles);
+        }
+
+    } catch (e) {
+        console.error('❌ Erro no loop principal:', e);
+    }
+
+    isUpdating = false;
+}
+
+// Função para iniciar os gráficos de vela corretamente (subsidiando o bug de atualização simples)
+function initCandleCharts() {
+    CANDLE_INTERVALS.forEach(interval => {
+        fetchAndUpdateCandles(interval, 50).then(candles => {
+            if (candles) {
+                const containerId = `chart-${interval}`;
+                const container = document.getElementById(containerId);
+                if (!container || typeof LightweightCharts === 'undefined') return;
+
+                const chart = LightweightCharts.createChart(container, {
+                    width: container.clientWidth,
+                    height: 250,
+                    layout: { background: { color: '#1a1a2e' }, textColor: '#95a5a6' },
+                    grid: { vertLines: { color: '#2c3e50' }, horzLines: { color: '#2c3e50' } },
+                    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                    timeScale: { timeVisible: true, secondsVisible: false },
+                });
+
+                const series = chart.addCandlestickSeries({
+                    upColor: '#00d98e', downColor: '#e94560', borderDownColor: '#e94560',
+                    borderUpColor: '#00d98e', wickDownColor: '#e94560', wickUpColor: '#00d98e'
+                });
+
+                series.setData(candles.map(c => ({
+                    time: Math.floor(c.time / 1000),
+                    open: c.open, high: c.high, low: c.low, close: c.close
+                })));
+
+                // Guarda referência para atualizar depois
+                candleCharts[interval] = chart;
+                chart._series = series; // Hack leve para acesso rápido na atualização
+
+                // Responsividade
+                const ro = new ResizeObserver(entries => {
+                    if (entries[0]) chart.applyOptions({ width: entries[0].contentRect.width });
+                });
+                ro.observe(container);
+            }
+        });
+    });
+}
 
 // ================================================================
 // FIX: Inicialização — o código original não tinha ponto de entrada
+// ================================================================
+// ================================================================
+// INICIALIZAÇÃO (ATUALIZADA)
 // ================================================================
 function initApp() {
     console.log('🚀 BTC Analyzer v13 — Inicializando...');
     loadWeightsV6();
     loadAlertLog();
     initScoreChart();
-    console.log(`✅ Pronto. AlertLog: ${alertLog.length} registros | Pesos carregados.`);
+    
+    // Inicia o motor de dados
+    console.log('⏳ Buscando dados da Binance...');
+    initCandleCharts();
+    
+    // Executa o loop imediatamente, e depois a cada 15 segundos
+    mainLoop();
+    setInterval(mainLoop, 15000); // 15000ms = 15 segundos
+    
+    console.log('✅ Motor de dados ativo. Atualizando a cada 15s.');
 }
 
 // Executar init quando o DOM estiver pronto
