@@ -1,8 +1,8 @@
 ﻿// ================================================================
-// CONFIGURAÇÕES GLOBAIS
+// CONFIGURAÇÕES GLOBAIS E ESTADO
 // ================================================================
-// FIX: AVISO — Token exposto em hardcode. Em produção, injetar via variável de ambiente
-// ou input de configuração. Nunca commitar credenciais em repositório público.
+// FIX: AVISO CRÍTICO — Em produção, injete esta credencial via variável de ambiente.
+// Nunca commit tokens em repositórios públicos.
 const TELEGRAM_TOKEN = '8670184440:AAFBfhFFTMnUWsgIFyRh0huBYbL-Q_vhT5k';
 const TELEGRAM_CHAT_ID = '1137196768';
 const ALERT_COOLDOWN = 60000;
@@ -49,23 +49,21 @@ let globalData = {
 let componentWeights = { trend: 0.25, momentum: 0.20, structure: 0.15, onchain: 0.10, volume: 0.15, oi: 0.15 };
 let ema50History = [];
 
-
-
-
-// ================================================================
-// HISTÓRICO DE SCORE (GRÁFICO)
-// ================================================================
-// FIX: Reduzido de 2000 para 500 — 2000 pontos causam degradação de performance
+// FIX: Reduzido de 2000 para 500 para evitar degradação de performance
 let scoreHistory = [];
 const MAX_SCORE_HISTORY = 500;
 let scoreChart = null;
 let currentScoreTimeframe = '1h';
 
+// Configuração dos gráficos de vela
+const CANDLE_INTERVALS = ['1m', '5m', '15m'];
+let candleCharts = { '1m': null, '5m': null, '15m': null };
+
 
 
 
 // ================================================================
-// TELEGRAM (MANTIDO)
+// TELEGRAM
 // ================================================================
 async function sendTelegramAlert(message) {
     try {
@@ -92,8 +90,7 @@ async function sendStructuredAlert(signalType, score, price, stop, targets, rati
     msg += `Probabilidade estimada: ${(prob*100).toFixed(0)}%\nFundamentos: ${rationale}\n⏰ ${getCurrentTimestamp()}`;
     const success = await sendTelegramAlert(msg);
     if (success) {
-        alertLog.push({ timestamp: Date.now(), type: signalType, score, price, rationale, components, win: null, pnl: null,
-            regime: currentRegime });
+        alertLog.push({ timestamp: Date.now(), type: signalType, score, price, rationale, components, win: null, pnl: null, regime: currentRegime });
         localStorage.setItem('alertLog', JSON.stringify(alertLog.slice(-100)));
     }
     return success;
@@ -117,7 +114,7 @@ function updateTelegramStatus() {
 
 
 // ================================================================
-// HELPERS BASE
+// HELPERS BASE & INDICADORES PUROS
 // ================================================================
 function getHistoricalWinrate(cond) {
     const log = alertLog.filter(t => t.type === cond.signal && t.win !== null);
@@ -147,9 +144,8 @@ function calculateRSI(data, period = 14) {
     let avgGain = gains / period, avgLoss = losses / period;
     for (let i = period + 1; i < data.length; i++) {
         const diff = data[i] - data[i - 1];
-        if (diff >= 0) { avgGain = (avgGain * (period - 1) + diff) / period;
-            avgLoss = (avgLoss * (period - 1)) / period; } else { avgGain = (avgGain * (period - 1)) / period;
-            avgLoss = (avgLoss * (period - 1) - diff) / period; }
+        if (diff >= 0) { avgGain = (avgGain * (period - 1) + diff) / period; avgLoss = (avgLoss * (period - 1)) / period; } 
+        else { avgGain = (avgGain * (period - 1)) / period; avgLoss = (avgLoss * (period - 1) - diff) / period; }
     }
     if (avgLoss === 0) return 100;
     return 100 - (100 / (1 + (avgGain / avgLoss)));
@@ -165,8 +161,7 @@ function calculateOBV(candles) {
     let obv = 0;
     for (let i = 1; i < candles.length; i++) {
         const c = candles[i].close, pc = candles[i - 1].close, v = candles[i].volume || 0;
-        if (c > pc) obv += v;
-        else if (c < pc) obv -= v;
+        if (c > pc) obv += v; else if (c < pc) obv -= v;
     }
     return obv;
 }
@@ -175,15 +170,14 @@ function getCurrentTimestamp() {
     return new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: 'short',
         day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
-function formatCurrency(v) { return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2,
-        maximumFractionDigits: 2 }); }
+function formatCurrency(v) { return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function getChangeClass(v) { return parseFloat(v) >= 0 ? 'positive' : 'negative'; }
 
 
 
 
 // ================================================================
-// KELLY SEGMENTADO
+// KELLY, REGIME E CHOPPINESS
 // ================================================================
 function calculateKellySizingByRegime(regime) {
     const baseRisk = regime === 'RANGE' ? 0.005 : 0.02;
@@ -193,19 +187,11 @@ function calculateKellySizingByRegime(regime) {
     const wins = regimeTrades.filter(t => t.win).length;
     const wr = wins / regimeTrades.length;
     const avgWin = regimeTrades.filter(t => t.win).reduce((s, t) => s + (t.pnl || 0), 0) / Math.max(1, wins);
-    const avgLoss = Math.abs(regimeTrades.filter(t => !t.win).reduce((s, t) => s + (t.pnl || 0), 0)) / Math.max(1,
-        regimeTrades.length - wins);
+    const avgLoss = Math.abs(regimeTrades.filter(t => !t.win).reduce((s, t) => s + (t.pnl || 0), 0)) / Math.max(1, regimeTrades.length - wins);
     const kelly = (wr * avgWin - (1 - wr) * avgLoss) / avgWin;
     const safeKelly = Math.max(0, kelly * 0.25);
     return Math.min(maxRisk, Math.max(0.005, safeKelly));
 }
-
-
-
-
-// ================================================================
-// REGIME CORRIGIDO (com detecção correta de slope)
-// ================================================================
 function detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, adx) {
     const slope = (ema50Prev !== undefined && ema50Prev > 0) ? (ema50 - ema50Prev) / ema50Prev : 0;
     const isTrend = adx > 25;
@@ -222,13 +208,6 @@ function updateRegimeDisplay(regime) {
     el.textContent = `⚡ REGIME: ${regime}`;
     el.className = 'badge badge-regime ' + regime.toLowerCase();
 }
-
-
-
-
-// ================================================================
-// CHOPPINESS
-// ================================================================
 function choppinessIndex(candles, period = 14) {
     if (!candles || candles.length < period) return 100;
     const slice = candles.slice(-period);
@@ -243,13 +222,11 @@ function choppinessIndex(candles, period = 14) {
 
 
 // ================================================================
-// SUPORTE/RESISTÊNCIA HORIZONTAL
+// SUPORTE/RESISTÊNCIA, OTIMIZAÇÃO DE PESOS E MTF
 // ================================================================
 function getHorizontalSR(candles) {
     if (!candles || candles.length < 24) return { support: 0, resistance: 0 };
-    const day = candles.slice(-24);
-    const week = candles.slice(-168);
-    const month = candles.slice(-720);
+    const day = candles.slice(-24), week = candles.slice(-168), month = candles.slice(-720);
     const sD = Math.min(...day.map(c => c.low)), rD = Math.max(...day.map(c => c.high));
     const sW = week.length ? Math.min(...week.map(c => c.low)) : sD;
     const rW = week.length ? Math.max(...week.map(c => c.high)) : rD;
@@ -257,23 +234,13 @@ function getHorizontalSR(candles) {
     const rM = month.length ? Math.max(...month.map(c => c.high)) : rW;
     return { support: Math.min(sD, sW, sM), resistance: Math.max(rD, rW, rM) };
 }
-
-
-
-
-// ================================================================
-// OTIMIZAÇÃO DE PESOS
-// ================================================================
 function evalWeights(weights, dataset) {
-    const names = Object.keys(filterWeights);
-    let correct = 0;
+    const names = Object.keys(filterWeights); let correct = 0;
     for (const trade of dataset) {
-        const features = trade.features || {};
-        let score = 0;
+        const features = trade.features || {}; let score = 0;
         names.forEach((name, idx) => { score += (features[name] || 50) * weights[idx]; });
         score = Math.min(100, Math.max(0, score));
-        const pred = score >= 55 ? 1 : 0;
-        if (pred === (trade.outcome ? 1 : 0)) correct++;
+        if ((score >= 55 ? 1 : 0) === (trade.outcome ? 1 : 0)) correct++;
     }
     return correct / dataset.length;
 }
@@ -287,88 +254,51 @@ function optimizeWeightsV6(history) {
     let curW = [...bestW], curScore = bestScore;
     for (let iter = 0; iter < 100; iter++) {
         const temp = 1 * (1 - iter / 100);
-        const neighbor = curW.map(w => {
-            let nw = w + (Math.random() - 0.5) * 0.05 * (temp + 0.05);
-            return Math.max(0.01, Math.min(0.5, nw));
-        });
-        const sum = neighbor.reduce((a, b) => a + b, 0);
-        const norm = neighbor.map(w => w / sum);
+        const neighbor = curW.map(w => { let nw = w + (Math.random() - 0.5) * 0.05 * (temp + 0.05); return Math.max(0.01, Math.min(0.5, nw)); });
+        const sum = neighbor.reduce((a, b) => a + b, 0); const norm = neighbor.map(w => w / sum);
         const nScore = evalWeights(norm, train);
         if (nScore > curScore || Math.random() < Math.exp((nScore - curScore) / (temp + 0.001))) {
-            curW = norm;
-            curScore = nScore;
-            if (nScore > bestScore) { bestW = [...norm];
-                bestScore = nScore; }
+            curW = norm; curScore = nScore;
+            if (nScore > bestScore) { bestW = [...norm]; bestScore = nScore; }
         }
     }
-    const valScore = evalWeights(bestW, val);
-    if (valScore < bestScore * 0.85) console.warn('⚠️ Overfitting detectado!');
-    const result = {};
-    names.forEach((n, i) => result[n] = bestW[i]);
-    return result;
+    if (evalWeights(bestW, val) < bestScore * 0.85) console.warn('⚠️ Overfitting detectado!');
+    const result = {}; names.forEach((n, i) => result[n] = bestW[i]); return result;
 }
 function updateFilterWeightsV6() {
     if (tradeHistory.length < OPTIMIZATION_INTERVAL) return;
-    const recent = tradeHistory.slice(-OPTIMIZATION_INTERVAL);
-    const newW = optimizeWeightsV6(recent);
-    if (newW) { Object.assign(filterWeights, newW);
-        localStorage.setItem('filterWeightsV6', JSON.stringify(filterWeights)); }
+    const newW = optimizeWeightsV6(tradeHistory.slice(-OPTIMIZATION_INTERVAL));
+    if (newW) { Object.assign(filterWeights, newW); localStorage.setItem('filterWeightsV6', JSON.stringify(filterWeights)); }
 }
 function loadWeightsV6() {
-    // FIX: Validação do JSON parseado — evita crash se o formato mudou entre versões
     try {
         const saved = localStorage.getItem('filterWeightsV6');
         if (!saved) return;
         const parsed = JSON.parse(saved);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
         for (const key of Object.keys(filterWeights)) {
-            if (typeof parsed[key] === 'number' && parsed[key] > 0) {
-                filterWeights[key] = parsed[key];
-            }
+            if (typeof parsed[key] === 'number' && parsed[key] > 0) filterWeights[key] = parsed[key];
         }
-    } catch (e) {
-        console.warn('⚠️ Falha ao carregar pesos persistidos, usando defaults:', e);
-        localStorage.removeItem('filterWeightsV6');
-    }
+    } catch (e) { console.warn('⚠️ Falha ao carregar pesos persistidos:', e); localStorage.removeItem('filterWeightsV6'); }
 }
-
-
-
-
-// ================================================================
-// MTF (CORRIGIDO: FALLBACK NEUTRO)
-// ================================================================
 async function fetchMTFData(symbol = 'BTCUSDT') {
     try {
-        const [c1h, c4h, c1d] = await Promise.all([
-            fetchCandles(symbol, '1h', 50),
-            fetchCandles(symbol, '4h', 50),
-            fetchCandles(symbol, '1d', 50)
-        ]);
+        const [c1h, c4h, c1d] = await Promise.all([fetchCandles(symbol, '1h', 50), fetchCandles(symbol, '4h', 50), fetchCandles(symbol, '1d', 50)]);
         return { c1h: c1h || [], c4h: c4h || [], c1d: c1d || [] };
     } catch (e) { console.warn('MTF fetch error:', e); return { c1h: [], c4h: [], c1d: [] }; }
 }
 function buildHistoricalMTF(dataset4h, uptoIndex) {
-    const slice = dataset4h.slice(0, uptoIndex + 1);
-    const c4h = slice.slice(-50);
-    const c1d = [];
+    const slice = dataset4h.slice(0, uptoIndex + 1); const c4h = slice.slice(-50); const c1d = [];
     for (let i = slice.length - 1; i >= 5 && c1d.length < 50; i -= 6) {
-        const block = slice.slice(Math.max(0, i - 5), i + 1);
-        if (block.length === 0) break;
-        c1d.unshift({
-            close: block[block.length - 1].close,
-            high: Math.max(...block.map(c => c.high)),
-            low: Math.min(...block.map(c => c.low))
-        });
+        const block = slice.slice(Math.max(0, i - 5), i + 1); if (block.length === 0) break;
+        c1d.unshift({ close: block[block.length - 1].close, high: Math.max(...block.map(c => c.high)), low: Math.min(...block.map(c => c.low)) });
     }
     return { c1h: c4h, c4h: c4h, c1d: c1d.length > 0 ? c1d : c4h };
 }
 function getTrendEMA(candles) {
     if (!candles || candles.length < 50) return 0;
-    const closes = candles.map(d => d.close);
-    const ema50 = calculateEMA(closes, 50), ema200 = calculateEMA(closes, 200);
-    if (!ema50 || !ema200) return 0;
-    return ema50 > ema200 ? 1 : -1;
+    const ema50 = calculateEMA(candles.map(d => d.close), 50), ema200 = calculateEMA(candles.map(d => d.close), 200);
+    if (!ema50 || !ema200) return 0; return ema50 > ema200 ? 1 : -1;
 }
 function checkMTFAlignment(mtf, signal, price) {
     const { c1h, c4h, c1d } = mtf;
@@ -386,104 +316,66 @@ function checkMTFAlignment(mtf, signal, price) {
 
 
 // ================================================================
-// BOOK DEPTH (CORRIGIDO: NÃO BLOQUEIA O BACKTEST)
+// BOOK DEPTH, BOLLINGER, WHALE, LIQUIDEZ
 // ================================================================
 async function fetchOrderBookDepth(symbol, limit = 20) {
     try {
         const r = await fetch(`https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=${limit}`);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const data = await r.json();
-        return {
-            bids: data.bids.map(([p, q]) => [parseFloat(p), parseFloat(q)]),
-            asks: data.asks.map(([p, q]) => [parseFloat(p), parseFloat(q)])
-        };
+        if (!r.ok) throw new Error('HTTP ' + r.status); const data = await r.json();
+        return { bids: data.bids.map(([p, q]) => [parseFloat(p), parseFloat(q)]), asks: data.asks.map(([p, q]) => [parseFloat(p), parseFloat(q)]) };
     } catch (e) { console.warn('Order book depth error:', e); return null; }
 }
 async function checkClusterOrders(symbol, price, side, tolerance = 0.005) {
-    const depth = await fetchOrderBookDepth(symbol, 10);
-    if (!depth) return null;
+    const depth = await fetchOrderBookDepth(symbol, 10); if (!depth) return null;
     const levels = side === 'BUY' ? depth.asks : depth.bids;
     const targetPrice = side === 'BUY' ? price * (1 + tolerance) : price * (1 - tolerance);
     let volume = 0;
-    for (const [p, q] of levels) {
-        if (side === 'BUY' && p > targetPrice) break;
-        if (side === 'SELL' && p < targetPrice) break;
-        volume += q;
-    }
+    for (const [p, q] of levels) { if (side === 'BUY' && p > targetPrice) break; if (side === 'SELL' && p < targetPrice) break; volume += q; }
     return { cluster: volume > 10, volume };
 }
-
-
-
-
-// ================================================================
-// BAND WIDTH
-// ================================================================
 function calculateBollingerBandWidth(candles, period = 20, mult = 2) {
     if (candles.length < period) return 0;
-    const closes = candles.slice(-period).map(c => c.close);
-    const sma = closes.reduce((a, b) => a + b, 0) / period;
-    const std = Math.sqrt(closes.reduce((a, b) => a + (b - sma) ** 2, 0) / period);
-    return (2 * mult * std) / sma;
+    const closes = candles.slice(-period).map(c => c.close); const sma = closes.reduce((a, b) => a + b, 0) / period;
+    const std = Math.sqrt(closes.reduce((a, b) => a + (b - sma) ** 2, 0) / period); return sma > 0 ? (2 * mult * std) / sma : 0;
 }
-
-
-
-
-// ================================================================
-// WHALE CONFLUENCE (CORRIGIDO: AGORA APLICA AO TAMANHO)
-// ================================================================
 function getWhaleConfluenceMultiplier(signal, whaleAction) {
-    const whaleBullish = whaleAction === 'accumulating';
-    const whaleBearish = whaleAction === 'distributing';
-    if (signal === 'LONG' && whaleBearish) return 0.5;
-    if (signal === 'SHORT' && whaleBullish) return 0.5;
+    if (signal === 'LONG' && whaleAction === 'distributing') return 0.5;
+    if (signal === 'SHORT' && whaleAction === 'accumulating') return 0.5;
     return 1.0;
 }
-
-
-
-
-// ================================================================
-// LIQUIDEZ
-// ================================================================
 function getLiquidityRegime() {
-    const now = new Date();
-    const day = now.getUTCDay();
-    const hour = now.getUTCHours();
-    const isDeadHour = hour >= 0 && hour < 2;
-    if (isDeadHour) return { tradeable: false, scorePenalty: 0 };
+    const now = new Date(); const hour = now.getUTCHours(), day = now.getUTCDay();
+    if (hour >= 0 && hour < 2) return { tradeable: false, scorePenalty: 0 };
     if (day === 0 || day === 6) return { tradeable: true, scorePenalty: 8 };
     return { tradeable: true, scorePenalty: 0 };
 }
-
-
-
-
-// ================================================================
-// SUPORTE/RESISTÊNCIA DINÂMICO
-// ================================================================
 function updateLiveSupportResistance() {
     if (candleHistory.length < 20) return;
     const sr = getHorizontalSR(candleHistory);
-    globalData.support = sr.support || 58000;
-    globalData.resistance = sr.resistance || 70000;
+    globalData.support = sr.support || 58000; globalData.resistance = sr.resistance || 70000;
+}
+function getDynamicLevels(candles) {
+    if (!candles || candles.length < 20) return { support: 58000, resistance: 70000 };
+    const slice = candles.slice(-20);
+    return { support: Math.min(...slice.map(c => c.low)), resistance: Math.max(...slice.map(c => c.high)) };
+}
+function getVolumeStats(candles) {
+    if (!candles || candles.length < 1) return { volume: 0, avgVolume: 0 };
+    const volumes = candles.map(c => c.volume || 0); const avg = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+    return { volume: volumes[volumes.length - 1] || 0, avgVolume: avg };
 }
 
 
 
 
 // ================================================================
-// ESTRATÉGIAS (REGIME-AWARE, BOS/CHoCH, FUNDING Z-SCORE, OI DIRECIONAL)
+// ESTRATÉGIAS E DETECÇÃO DE ESTRUTURA
 // ================================================================
 function getRegimeAwareSignal(simData, regime) {
     if (regime === 'RANGE') {
-        const range = simData.resistance - simData.support;
-        if (range <= 0) return 'NEUTRAL';
+        const range = simData.resistance - simData.support; if (range <= 0) return 'NEUTRAL';
         const pos = (simData.price - simData.support) / range;
-        if (pos < 0.15 && simData.rsi < 35) return 'LONG';
-        if (pos > 0.85 && simData.rsi > 65) return 'SHORT';
-        return 'NEUTRAL';
+        if (pos < 0.15 && simData.rsi < 35) return 'LONG'; if (pos > 0.85 && simData.rsi > 65) return 'SHORT'; return 'NEUTRAL';
     }
     const distFromEma50Pct = simData.ema50 ? Math.abs(simData.price - simData.ema50) / simData.ema50 * 100 : 100;
     const isPullback = distFromEma50Pct < 2;
@@ -493,141 +385,95 @@ function getRegimeAwareSignal(simData, regime) {
 }
 function detectStructureBreak(candles, lookback = 10) {
     if (!candles || candles.length < lookback + 2) return { type: null, level: null };
-    const recent = candles.slice(-lookback - 1, -1);
-    const current = candles[candles.length - 1];
-    const swingHigh = Math.max(...recent.map(c => c.high));
-    const swingLow = Math.min(...recent.map(c => c.low));
-    if (current.close > swingHigh) return { type: 'BOS_UP', level: swingHigh };
-    if (current.close < swingLow) return { type: 'BOS_DOWN', level: swingLow };
+    const recent = candles.slice(-lookback - 1, -1); const current = candles[candles.length - 1];
+    const swingHigh = Math.max(...recent.map(c => c.high)), swingLow = Math.min(...recent.map(c => c.low));
+    if (current.close > swingHigh) return { type: 'BOS_UP', level: swingHigh }; if (current.close < swingLow) return { type: 'BOS_DOWN', level: swingLow };
     return { type: null, level: null };
 }
 function getPriceActionScore(candles, signal) {
     const sb = detectStructureBreak(candles, 10);
-    if (signal === 'LONG' && sb.type === 'BOS_UP') return 80;
-    if (signal === 'SHORT' && sb.type === 'BOS_DOWN') return 80;
-    if (sb.type === null) return 45;
-    return 25;
+    if (signal === 'LONG' && sb.type === 'BOS_UP') return 80; if (signal === 'SHORT' && sb.type === 'BOS_DOWN') return 80;
+    if (sb.type === null) return 45; return 25;
 }
-function getFundingZScore(currentFunding, fundingHistory) {
-    if (!fundingHistory || fundingHistory.length < 10) return 0;
-    const values = fundingHistory.map(f => f.fundingRate);
+function getFundingZScore(currentFunding, fHist) {
+    if (!fHist || fHist.length < 10) return 0; const values = fHist.map(f => f.fundingRate);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     const std = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
-    if (std === 0) return 0;
-    return (currentFunding - mean) / std;
+    return std === 0 ? 0 : (currentFunding - mean) / std;
 }
 function classifyOIRisk(oiDeltaPct, priceDeltaPct) {
-    if (oiDeltaPct > 10 && priceDeltaPct > 1) return 'HEALTHY_LONG';
-    if (oiDeltaPct > 10 && priceDeltaPct < -1) return 'SQUEEZE_RISK_SHORT';
-    if (oiDeltaPct > 10 && Math.abs(priceDeltaPct) <= 1) return 'SQUEEZE_RISK_LONG';
-    return 'NEUTRAL';
+    if (oiDeltaPct > 10 && priceDeltaPct > 1) return 'HEALTHY_LONG'; if (oiDeltaPct > 10 && priceDeltaPct < -1) return 'SQUEEZE_RISK_SHORT';
+    if (oiDeltaPct > 10 && Math.abs(priceDeltaPct) <= 1) return 'SQUEEZE_RISK_LONG'; return 'NEUTRAL';
+}
+function getTrendStrength(candles) {
+    if (!candles || candles.length < 20) return { adx: 20, slope: 0, trending: false };
+    const closes = candles.map(d => d.close); const gains = [], losses = [];
+    for (let i = 1; i < closes.length; i++) { const diff = closes[i] - closes[i - 1]; if (diff >= 0) gains.push(diff); else losses.push(-diff); }
+    const period = 14; const avgGain = gains.slice(-period).reduce((a, b) => a + b, 0) / period;
+    const avgLoss = losses.slice(-period).reduce((a, b) => a + b, 0) / period;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss; const adx = Math.min(100, (rs / (1 + rs)) * 100);
+    const ema20 = calculateEMA(closes, 20), ema50 = calculateEMA(closes, 50);
+    const slope = ema20 && ema50 ? (ema20 - ema50) / ema50 * 100 : 0;
+    return { adx, slope, trending: adx > 25 && Math.abs(slope) > 0.5 };
 }
 
 
 
 
 // ================================================================
-// CONFIRMAÇÃO DE SINAL V13 (CORRIGIDO)
+// DIVERGÊNCIAS E STOPS
 // ================================================================
-function getDynamicWeights(regime) { return regimeWeights[regime] || regimeWeights.BULL; }
-function getDynamicFilterWeights(regime) {
-    const base = { ...filterWeights };
-    if (regime === 'RANGE') { base.structure = 0.20;
-        base.trend = 0.08;
-        base.volume = 0.08; } else { base.trend = 0.25;
-        base.structure = 0.10;
-        base.volume = 0.12; }
-    return base;
-}
 function detectDivergenceClassicV8(candles, indicatorVals, signal, atr) {
     if (!candles || !indicatorVals || candles.length < 10) return false;
     const priceRange = Math.max(...candles.map(c => c.high)) - Math.min(...candles.map(c => c.low));
-    const atrPct = atr / (priceRange || 1);
-    let period = atrPct > 0.03 ? 3 : atrPct > 0.015 ? 5 : 7;
-    period = Math.min(period, Math.floor(candles.length / 2));
-    if (candles.length < period * 2) return false;
+    const atrPct = atr / (priceRange || 1); let period = atrPct > 0.03 ? 3 : atrPct > 0.015 ? 5 : 7;
+    period = Math.min(period, Math.floor(candles.length / 2)); if (candles.length < period * 2) return false;
     const recentC = candles.slice(-period), recentI = indicatorVals.slice(-period);
-    const priceLow = Math.min(...recentC.map(c => c.low)), indLow = Math.min(...recentI);
     const prevC = candles.slice(-(period * 2), -period), prevI = indicatorVals.slice(-(period * 2), -period);
     if (prevC.length === 0 || prevI.length === 0) return false;
-    const prevPriceLow = Math.min(...prevC.map(c => c.low)), prevIndLow = Math.min(...prevI);
-    const bullish = priceLow < prevPriceLow && indLow > prevIndLow;
-    const priceHigh = Math.max(...recentC.map(c => c.high)), indHigh = Math.max(...recentI);
-    const prevPriceHigh = Math.max(...prevC.map(c => c.high)), prevIndHigh = Math.max(...prevI);
-    const bearish = priceHigh > prevPriceHigh && indHigh < prevIndHigh;
-    if (signal === 'LONG') return bullish;
-    if (signal === 'SHORT') return bearish;
+    if (signal === 'LONG') { const pl = Math.min(...recentC.map(c=>c.low)), pil = Math.min(...prevI); const ppl = Math.min(...prevC.map(c=>c.low)), ppil = Math.min(...prevI); return pl < ppl && pil > ppil; }
+    if (signal === 'SHORT') { const ph = Math.max(...recentC.map(c=>c.high)), pih = Math.max(...recentI); const pph = Math.max(...prevC.map(c=>c.high)), ppih = Math.max(...prevI); return ph > pph && pih < ppih; }
     return false;
 }
 function detectDivergenceMultiV8(candles, rsiVals, macdVals, obvVals, signal, atr) {
-    if (!candles || candles.length < 20) return 0;
-    let score = 0;
-    const rsiDiv = detectDivergenceClassicV8(candles, rsiVals, signal, atr);
-    const macdDiv = detectDivergenceClassicV8(candles, macdVals, signal, atr);
-    const obvDiv = detectDivergenceClassicV8(candles, obvVals, signal, atr);
-    const count = [rsiDiv, macdDiv, obvDiv].filter(Boolean).length;
-    if (count >= 2) score += 30;
-    else if (count === 1) score += 15;
-    const bearishDiv = detectDivergenceClassicV8(candles, rsiVals, 'SHORT', atr);
-    const bullishDiv = detectDivergenceClassicV8(candles, rsiVals, 'LONG', atr);
-    if (signal === 'LONG' && bearishDiv) score -= 40;
-    if (signal === 'SHORT' && bullishDiv) score -= 40;
+    if (!candles || candles.length < 20) return 0; let score = 0;
+    const count = [detectDivergenceClassicV8(candles, rsiVals, signal, atr), detectDivergenceClassicV8(candles, macdVals, signal, atr), detectDivergenceClassicV8(candles, obvVals, signal, atr)].filter(Boolean).length;
+    if (count >= 2) score += 30; else if (count === 1) score += 15;
+    if (signal === 'LONG' && detectDivergenceClassicV8(candles, rsiVals, 'SHORT', atr)) score -= 40;
+    if (signal === 'SHORT' && detectDivergenceClassicV8(candles, rsiVals, 'LONG', atr)) score -= 40;
     return clamp(score, -40, 40);
 }
 function detectVolumeDeltaDivergence(candles, obvVals, signal) {
     if (!candles || candles.length < 10 || !obvVals || obvVals.length < 10) return 0;
-    const recentC = candles.slice(-5), recentOBV = obvVals.slice(-5);
-    const priceLow = Math.min(...recentC.map(c => c.low)), obvLow = Math.min(...recentOBV);
-    const prevC = candles.slice(-10, -5), prevOBV = obvVals.slice(-10, -5);
+    const recentC = candles.slice(-5), recentOBV = obvVals.slice(-5); const prevC = candles.slice(-10, -5), prevOBV = obvVals.slice(-10, -5);
     if (prevC.length === 0 || prevOBV.length === 0) return 0;
-    const prevPriceLow = Math.min(...prevC.map(c => c.low)), prevObvLow = Math.min(...prevOBV);
-    const bullishDiv = priceLow < prevPriceLow && obvLow > prevObvLow;
-    const priceHigh = Math.max(...recentC.map(c => c.high)), obvHigh = Math.max(...recentOBV);
-    const prevPriceHigh = Math.max(...prevC.map(c => c.high)), prevObvHigh = Math.max(...prevOBV);
-    const bearishDiv = priceHigh > prevPriceHigh && obvHigh < prevObvHigh;
-    if ((bullishDiv && signal === 'LONG') || (bearishDiv && signal === 'SHORT')) return 20;
-    if ((bullishDiv && signal === 'SHORT') || (bearishDiv && signal === 'LONG')) return -30;
-    return 0;
+    const bullDiv = Math.min(...recentC.map(c=>c.low)) < Math.min(...prevC.map(c=>c.low)) && Math.min(...recentOBV) > Math.min(...prevOBV);
+    const bearDiv = Math.max(...recentC.map(c=>c.high)) > Math.max(...prevC.map(c=>c.high)) && Math.max(...recentOBV) < Math.max(...prevOBV);
+    if ((bullDiv && signal === 'LONG') || (bearDiv && signal === 'SHORT')) return 20;
+    if ((bullDiv && signal === 'SHORT') || (bearDiv && signal === 'LONG')) return -30; return 0;
 }
 function getStopLossV8(regime, atr, price, side, support, resistance) {
-    const mult = regime === 'RANGE' ? 1.5 : 2.5;
-    let stop = side === 'LONG' ? price - atr * mult : price + atr * mult;
-    if (side === 'LONG' && support && stop < support) stop = support * 0.995;
-    if (side === 'SHORT' && resistance && stop > resistance) stop = resistance * 1.005;
-    return stop;
+    const mult = regime === 'RANGE' ? 1.5 : 2.5; let stop = side === 'LONG' ? price - atr * mult : price + atr * mult;
+    if (side === 'LONG' && support && stop < support) stop = support * 0.995; if (side === 'SHORT' && resistance && stop > resistance) stop = resistance * 1.005; return stop;
 }
 function updateTrailingStopV8(regime, position, currentPrice, atr, support, resistance) {
-    let newStop = position.stop;
-    const mult = regime === 'RANGE' ? 0.8 : 1.5;
-    if (position.side === 'LONG') {
-        const atrStop = currentPrice - atr * mult, srStop = support || 0;
-        newStop = Math.max(atrStop, srStop);
-        if (position.tp1Hit && newStop < position.entryPrice) newStop = position.entryPrice + atr * 0.2;
-    } else {
-        const atrStop = currentPrice + atr * mult, srStop = resistance || Infinity;
-        newStop = Math.min(atrStop, srStop);
-        if (position.tp1Hit && newStop > position.entryPrice) newStop = position.entryPrice - atr * 0.2;
-    }
+    let newStop = position.stop; const mult = regime === 'RANGE' ? 0.8 : 1.5;
+    if (position.side === 'LONG') { const atrStop = currentPrice - atr * mult, srStop = support || 0; newStop = Math.max(atrStop, srStop); if (position.tp1Hit && newStop < position.entryPrice) newStop = position.entryPrice + atr * 0.2; }
+    else { const atrStop = currentPrice + atr * mult, srStop = resistance || Infinity; newStop = Math.min(atrStop, srStop); if (position.tp1Hit && newStop > position.entryPrice) newStop = position.entryPrice - atr * 0.2; }
     return newStop;
 }
 function generateScaledTargetsV8(entry, stop, signalType, volatilityRegime, regime) {
-    const risk = Math.abs(entry - stop);
-    let p;
-    if (regime === 'RANGE') p = { tp1: 1.5, tp2: 2.5, tp3: 3.5 };
-    else p = { tp1: 2.0, tp2: 3.5, tp3: 5.0 };
+    const risk = Math.abs(entry - stop); let p = regime === 'RANGE' ? { tp1: 1.5, tp2: 2.5, tp3: 3.5 } : { tp1: 2.0, tp2: 3.5, tp3: 5.0 };
     const slippageBps = 5, fees = 0.001;
-    const configs = [{ rr: p.tp1, size: 0.30, label: 'TP1' }, { rr: p.tp2, size: 0.30, label: 'TP2' }, { rr: p.tp3,
-            size: 0.40, label: 'TP3' }];
-    if (regime === 'RANGE') { configs[1].size = 0.70;
-        configs[2].size = 0; }
+    let configs = [{ rr: p.tp1, size: 0.30, label: 'TP1' }, { rr: p.tp2, size: 0.30, label: 'TP2' }, { rr: p.tp3, size: 0.40, label: 'TP3' }];
+    if (regime === 'RANGE') { configs[1].size = 0.70; configs[2].size = 0; }
     return configs.filter(c => c.size > 0).map((config, idx) => {
         const targetBruto = signalType === 'LONG' ? entry + config.rr * risk : entry - config.rr * risk;
         const slippageAdj = targetBruto * (slippageBps / 10000) * (idx + 1);
         const targetReal = signalType === 'LONG' ? targetBruto - slippageAdj : targetBruto + slippageAdj;
         const targetAdjusted = signalType === 'LONG' ? targetReal * (1 - fees) : targetReal / (1 - fees);
         const pnlReal = signalType === 'LONG' ? (targetAdjusted - entry) / risk : (entry - targetAdjusted) / risk;
-        return { label: config.label, price: targetReal, size: config.size, rr: config.rr, rr_real: pnlReal,
-            slippageAdj: slippageAdj / targetBruto, signalType: signalType };
+        return { label: config.label, price: targetReal, size: config.size, rr: config.rr, rr_real: pnlReal, slippageAdj: slippageAdj / targetBruto, signalType };
     });
 }
 function updateBreakevenStopV8(position, targetHit, atr, regime) {
@@ -635,719 +481,277 @@ function updateBreakevenStopV8(position, targetHit, atr, regime) {
         const buffer = atr * (regime === 'RANGE' ? 0.3 : 0.5);
         if (position.side === 'LONG') position.stop = position.entryPrice + (position.entryPrice * 0.002) + buffer;
         else position.stop = position.entryPrice - (position.entryPrice * 0.002) - buffer;
-        position.breakeven = true;
-        position.breakeven_stop = position.stop;
-        console.log(`✅ Breakeven @ $${position.stop.toFixed(2)} (buffer: ${buffer.toFixed(2)})`);
+        position.breakeven = true; position.breakeven_stop = position.stop;
     }
 }
-function getTrendStrength(candles) {
-    if (!candles || candles.length < 20) return { adx: 20, slope: 0, trending: false };
-    const closes = candles.map(d => d.close);
-    const gains = [],
-        losses = [];
-    for (let i = 1; i < closes.length; i++) {
-        const diff = closes[i] - closes[i - 1];
-        if (diff >= 0) gains.push(diff);
-        else losses.push(-diff);
-    }
-    const period = 14;
-    const avgGain = gains.slice(-period).reduce((a, b) => a + b, 0) / period;
-    const avgLoss = losses.slice(-period).reduce((a, b) => a + b, 0) / period;
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    const adx = Math.min(100, (rs / (1 + rs)) * 100);
-    const ema20 = calculateEMA(closes, 20), ema50 = calculateEMA(closes, 50);
-    const slope = ema20 && ema50 ? (ema20 - ema50) / ema50 * 100 : 0;
-    return { adx, slope, trending: adx > 25 && Math.abs(slope) > 0.5 };
-}
-async function confirmSignalV13(signal, data, candles, rsiVals, macdVals, obvVals, mtfData, isBacktest = false, clusterData = null) {
-    if (!signal || signal === 'NEUTRAL') {
-        return { approved: false, score: 0, reasons: ['Sinal neutro'], regime: 'NEUTRO', required: 60, scoreBonus: 0,
-            scoreComponents: {} };
-    }
 
 
 
 
-    const liquidity = getLiquidityRegime();
-    if (!liquidity.tradeable && !isBacktest) {
-        return { approved: false, score: 0, reasons: ['Madrugada UTC — book fino'], regime: 'NEUTRO', required: 60,
-            scoreBonus: 0, scoreComponents: {} };
-    }
-
-
-
-
-    const closes = candles.map(c => c.close);
-    const ema50 = calculateEMA(closes, 50) || data.price;
-    const ema200 = calculateEMA(closes, 200) || data.price;
-    const adx = data.adx || 25;
-    const atr = data.atr || calculateATR(closes) || data.price * 0.02;
-    const atrPct = (atr / data.price) * 100;
-    atrPercentHistory.push(atrPct);
-    // FIX: Limitar tamanho do histórico de ATR para evitar memory leak
-    if (atrPercentHistory.length > 100) atrPercentHistory.shift();
-
-
-
-
-    const ema50Prev = data.ema50Prev !== undefined ? data.ema50Prev : ema50;
-    const regime = detectMarketRegimeFixed(data.price, ema50, ema50Prev, ema200, adx);
-    updateRegimeDisplay(regime);
-    currentRegime = regime;
-
-
-
-
-    if (!isBacktest && regime === 'RANGE') {
-        const ci = choppinessIndex(candles, 14);
-        if (ci > 60) {
-            return { approved: false, score: 0, reasons: [`Choppiness ${ci.toFixed(0)}% > 60`], regime, required: 75,
-                scoreBonus: 0, scoreComponents: {} };
-        }
-    }
-
-
-
-
-    const bbWidth = calculateBollingerBandWidth(candles, 20, 2);
-    let volatilityRegime = 'NORMAL';
-    if (bbWidth > 0 && bbWidth < 0.05) volatilityRegime = 'SQUEEZE';
-    else if (bbWidth > 0.15) volatilityRegime = 'HIGH';
-    else if (bbWidth > 0.08) volatilityRegime = 'NORMAL';
-    else volatilityRegime = 'LOW';
-
-
-
-
-    if (data.volume && data.avgVolume) {
-        const volRel = data.volume / data.avgVolume;
-        const threshold = isBacktest ? 1.0 : 1.4;
-        if (volRel < threshold) {
-            return { approved: false, score: 0, reasons: [`Volume relativo ${volRel.toFixed(2)} < ${threshold}`],
-                regime, required: 65, scoreBonus: 0, scoreComponents: {} };
-        }
-        if (!isBacktest) {
-            const recentVolumes = candles.slice(-5).map(c => c.volume || 0);
-            const maxVol = Math.max(...recentVolumes);
-            if (data.volume < maxVol) {
-                return { approved: false, score: 0, reasons: ['Volume não é o maior dos últimos 5'], regime,
-                    required: 65, scoreBonus: 0, scoreComponents: {} };
-            }
-        }
-    }
-
-
-
-
-    let clusterPenalty = 0;
-    if (clusterData === null) {
-        if (!isBacktest) clusterPenalty = 5;
-        else clusterPenalty = 0;
-    } else if (clusterData && clusterData.cluster && clusterData.volume > 15) {
-        return { approved: false, score: 0, reasons: ['Cluster de ordens no caminho'], regime, required: 65,
-            scoreBonus: 0, scoreComponents: {} };
-    }
-
-
-
-
-    let mtfPenalty = 0;
-    if (mtfData && mtfData.c1h && mtfData.c1h.length > 0 && mtfData.c4h && mtfData.c4h.length > 0 && mtfData.c1d && mtfData
-        .c1d.length > 0) {
-        const mtfResult = checkMTFAlignment(mtfData, signal, data.price);
-        if (!mtfResult.aligned) {
-            mtfPenalty = isBacktest ? -8 : -15;
-        }
-    } else {
-        mtfPenalty = isBacktest ? -5 : -10;
-    }
-
-
-
-
-    const dynWeights = getDynamicWeights(regime);
-    componentWeights = { trend: dynWeights.trend, momentum: dynWeights.momentum, structure: dynWeights.structure,
-        onchain: dynWeights.onChain, volume: dynWeights.volume, oi: dynWeights.oi };
-    const minScore = regime === 'RANGE' ? 75 : 65;
-    const baseRequired = isBacktest ? 50 : minScore;
-    const requiredScore = baseRequired + (isBacktest ? 0 : liquidity.scorePenalty + clusterPenalty);
-
-
-
-
-    const dynamic = getDynamicLevels(candles);
-    const horizontal = getHorizontalSR(candles);
-    const support = Math.max(dynamic.support, horizontal.support);
-    const resistance = Math.min(dynamic.resistance, horizontal.resistance);
-
-
-
-
-    let pa_score = getPriceActionScore(candles, signal);
-    if (data.price && support && resistance && pa_score === 45) {
-        const range = resistance - support;
-        const pos = (data.price - support) / range;
-        if (signal === 'LONG') {
-            if (pos > 0.7) pa_score = 75;
-            else if (pos > 0.5) pa_score = 65;
-            else if (pos < 0.3) pa_score = 45;
-            else pa_score = 55;
-        } else {
-            if (pos < 0.3) pa_score = 75;
-            else if (pos < 0.5) pa_score = 65;
-            else if (pos > 0.7) pa_score = 45;
-            else pa_score = 55;
-        }
-    }
-
-
-
-
-    const rsi = data.rsi || 50;
-    let momentum_score = 50;
-    const over = (signal === 'LONG' && rsi > 70) || (signal === 'SHORT' && rsi < 30);
-    const ali = (signal === 'LONG' && rsi > 50) || (signal === 'SHORT' && rsi < 50);
-    if (over) momentum_score = 35;
-    else if (ali) momentum_score = 65;
-
-
-
-
-    let macro_score = 50;
-    const good = (data.mvrv && data.mvrv < 0.85) && (data.sopr && data.sopr < 0.9);
-    const bad = (data.mvrv && data.mvrv > 1.3) && (data.sopr && data.sopr > 1.1);
-    if (good) macro_score = 75;
-    else if (bad) macro_score = 25;
-
-
-
-
-    let liq_score = isBacktest ? 60 : 50;
-    const ml_prob = predictDirectionV3(data);
-    const ml_score = 20 + ml_prob * 60;
-
-
-
-
-    let mtf_score = 50;
-    if (mtfData && mtfData.c1h && mtfData.c1h.length > 0) {
-        const mtfResult = checkMTFAlignment(mtfData, signal, data.price);
-        mtf_score = mtfResult.aligned ? 85 : 20;
-    }
-
-
-
-
-    let vol_score = 50;
-    if (data.volume && data.avgVolume) {
-        const volRel = data.volume / data.avgVolume;
-        if (volRel > 1.5) vol_score = 70;
-        else if (volRel > 1.0) vol_score = 60;
-        else vol_score = 40;
-    }
-
-
-
-
-    const fundingZ = getFundingZScore(data.fundingRate || 0, fundingHistory);
-    let funding_score = 50;
-    if (signal === 'LONG' && fundingZ < -2) funding_score = 75;
-    else if (signal === 'SHORT' && fundingZ > 2) funding_score = 75;
-    else if (signal === 'LONG' && fundingZ > 2) funding_score = 30;
-    else if (signal === 'SHORT' && fundingZ < -2) funding_score = 30;
-    else if (Math.abs(fundingZ) > 1 && Math.abs(fundingZ) < 2) funding_score = 55;
-    else funding_score = 50;
-
-
-
-
-    const oiRisk = classifyOIRisk(data.oiDelta || 0, data.priceDeltaPct || 0);
-    let oi_score = 50;
-    if (signal === 'LONG' && oiRisk === 'HEALTHY_LONG') oi_score = 80;
-    else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_SHORT') oi_score = 80;
-    else if (signal === 'LONG' && oiRisk === 'SQUEEZE_RISK_LONG') oi_score = 30;
-    else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_SHORT') oi_score = 30;
-    else oi_score = 50;
-
-
-
-
-    let div_score = 50;
-    if (candles && candles.length > 0 && rsiVals && rsiVals.length > 0) {
-        const divPenalty = detectDivergenceMultiV8(candles, rsiVals, macdVals, obvVals, signal, atr);
-        div_score = Math.min(70, Math.max(30, 50 + divPenalty));
-        const vdd = detectVolumeDeltaDivergence(candles, obvVals, signal);
-        div_score = clamp(div_score + vdd, 20, 90);
-    }
-
-
-
-
-    let trend_score = 50;
-    if (candles && candles.length > 0) {
-        const { adx, trending } = getTrendStrength(candles);
-        if (trending && adx > 40) trend_score = 80;
-        else if (trending) trend_score = 70;
-        else if (adx < 20) trend_score = 30;
-        else trend_score = 50;
-    }
-
-
-
-
-    const fw = getDynamicFilterWeights(regime);
-    const scores = {
-        price_action: pa_score,
-        momentum: momentum_score,
-        macro_crypto: macro_score,
-        liquidity_spread: liq_score,
-        ml_probability: ml_score,
-        mtf_alignment: mtf_score,
-        volume_liquidity: vol_score,
-        funding_onchain: funding_score,
-        divergence_penalty: div_score,
-        trend_strength: trend_score
-    };
-    let oiBonus = (oi_score - 50) * 0.08;
-
-
-
-
-    const weights = {
-        price_action: fw.price_action || 0.12,
-        momentum: fw.momentum || 0.12,
-        macro_crypto: fw.macro_crypto || 0.10,
-        liquidity_spread: fw.liquidity_spread || 0.08,
-        ml_probability: fw.ml_probability || 0.08,
-        mtf_alignment: fw.mtf_alignment || 0.10,
-        volume_liquidity: fw.volume_liquidity || 0.12,
-        funding_onchain: fw.funding_onchain || 0.14,
-        divergence_penalty: fw.divergence_penalty || 0.10,
-        trend_strength: fw.trend_strength || 0.14
-    };
-    let finalScore = 0;
-    for (const [key, w] of Object.entries(weights)) {
-        finalScore += (scores[key] || 50) * w;
-    }
-    finalScore = Math.min(100, Math.max(0, finalScore + mtfPenalty - clusterPenalty + oiBonus));
-    const approve = finalScore >= requiredScore;
-    const reasons = [`PA: ${scores.price_action.toFixed(0)}`, `Trend: ${scores.trend_strength.toFixed(0)}`,
-        `Mom: ${scores.momentum.toFixed(0)}`, `Vol: ${scores.volume_liquidity.toFixed(0)}`,
-        `MTF: ${scores.mtf_alignment.toFixed(0)}`, `OI: ${oi_score.toFixed(0)}`];
-    return {
-        approved: approve,
-        score: finalScore,
-        reasons,
-        regime,
-        required: requiredScore,
-        scoreBonus: approve ? (finalScore - 50) * 0.3 : -25,
-        scoreComponents: scores,
-        support,
-        resistance,
-        volatilityRegime
-    };
+// ================================================================
+// CONFIRMAÇÃO DE SINAL V13 (CORE ENGINE)
+// ================================================================
+function getDynamicWeights(regime) { return regimeWeights[regime] || regimeWeights.BULL; }
+function getDynamicFilterWeights(regime) {
+    const base = { ...filterWeights };
+    if (regime === 'RANGE') { base.structure = 0.20; base.trend = 0.08; base.volume = 0.08; } 
+    else { base.trend = 0.25; base.structure = 0.10; base.volume = 0.12; } return base;
 }
 function predictDirectionV3(data) {
-    const rsiScore = data.rsi ? (data.rsi - 50) / 50 : 0;
-    const fundingScore = data.fundingRate ? -data.fundingRate * 10000 : 0;
-    const mvrvScore = data.mvrv ? (1 - data.mvrv) * 2 : 0;
-    const prob = 0.5 + 0.1 * rsiScore + 0.1 * fundingScore + 0.1 * mvrvScore;
-    return Math.min(1, Math.max(0, prob));
+    const rsiScore = data.rsi ? (data.rsi - 50) / 50 : 0; const fundingScore = data.fundingRate ? -data.fundingRate * 10000 : 0;
+    const mvrvScore = data.mvrv ? (1 - data.mvrv) * 2 : 0; return Math.min(1, Math.max(0, 0.5 + 0.1 * rsiScore + 0.1 * fundingScore + 0.1 * mvrvScore));
 }
-function getDynamicLevels(candles) {
-    if (!candles || candles.length < 20) return { support: 58000, resistance: 70000 };
-    const slice = candles.slice(-20);
-    return { support: Math.min(...slice.map(c => c.low)), resistance: Math.max(...slice.map(c => c.high)) };
-}
-function getVolumeStats(candles) {
-    if (!candles || candles.length < 1) return { volume: 0, avgVolume: 0 };
-    const volumes = candles.map(c => c.volume || 0);
-    const avg = volumes.reduce((a, b) => a + b, 0) / volumes.length;
-    return { volume: volumes[volumes.length - 1] || 0, avgVolume: avg };
+async function confirmSignalV13(signal, data, candles, rsiVals, macdVals, obvVals, mtfData, isBacktest = false, clusterData = null) {
+    if (!signal || signal === 'NEUTRAL') return { approved: false, score: 0, reasons: ['Sinal neutro'], regime: 'NEUTRO', required: 60, scoreBonus: 0, scoreComponents: {} };
+    const liquidity = getLiquidityRegime();
+    if (!liquidity.tradeable && !isBacktest) return { approved: false, score: 0, reasons: ['Madrugada UTC — book fino'], regime: 'NEUTRO', required: 60, scoreBonus: 0, scoreComponents: {} };
+    const closes = candles.map(c => c.close); const ema50 = calculateEMA(closes, 50) || data.price;
+    const ema200 = calculateEMA(closes, 200) || data.price; const adx = data.adx || 25;
+    const atr = data.atr || calculateATR(closes) || data.price * 0.02; const atrPct = (atr / data.price) * 100;
+    atrPercentHistory.push(atrPct); if (atrPercentHistory.length > 100) atrPercentHistory.shift(); // FIX: Memory leak
+    const ema50Prev = data.ema50Prev !== undefined ? data.ema50Prev : ema50;
+    const regime = detectMarketRegimeFixed(data.price, ema50, ema50Prev, ema200, adx);
+    updateRegimeDisplay(regime); currentRegime = regime;
+    if (!isBacktest && regime === 'RANGE') { const ci = choppinessIndex(candles, 14); if (ci > 60) return { approved: false, score: 0, reasons: [`Choppiness ${ci.toFixed(0)}% > 60`], regime, required: 75, scoreBonus: 0, scoreComponents: {} }; }
+    const bbWidth = calculateBollingerBandWidth(candles, 20, 2);
+    let volatilityRegime = 'NORMAL';
+    if (bbWidth > 0 && bbWidth < 0.05) volatilityRegime = 'SQUEEZE'; else if (bbWidth > 0.15) volatilityRegime = 'HIGH'; else if (bbWidth > 0.08) volatilityRegime = 'NORMAL'; else volatilityRegime = 'LOW';
+    if (data.volume && data.avgVolume) {
+        const volRel = data.volume / data.avgVolume; const threshold = isBacktest ? 1.0 : 1.4;
+        if (volRel < threshold) return { approved: false, score: 0, reasons: [`Volume relativo ${volRel.toFixed(2)} < ${threshold}`], regime, required: 65, scoreBonus: 0, scoreComponents: {} };
+        if (!isBacktest) { const maxVol = Math.max(...candles.slice(-5).map(c => c.volume || 0)); if (data.volume < maxVol) return { approved: false, score: 0, reasons: ['Volume não é o maior dos últimos 5'], regime, required: 65, scoreBonus: 0, scoreComponents: {} }; }
+    }
+    let clusterPenalty = 0;
+    if (clusterData === null) { if (!isBacktest) clusterPenalty = 5; else clusterPenalty = 0; }
+    else if (clusterData && clusterData.cluster && clusterData.volume > 15) return { approved: false, score: 0, reasons: ['Cluster de ordens no caminho'], regime, required: 65, scoreBonus: 0, scoreComponents: {} };
+    let mtfPenalty = 0;
+    if (mtfData && mtfData.c1h?.length > 0 && mtfData.c4h?.length > 0 && mtfData.c1d?.length > 0) { if (!checkMTFAlignment(mtfData, signal, data.price).aligned) mtfPenalty = isBacktest ? -8 : -15; }
+    else { mtfPenalty = isBacktest ? -5 : -10; }
+    const dynWeights = getDynamicWeights(regime);
+    componentWeights = { trend: dynWeights.trend, momentum: dynWeights.momentum, structure: dynWeights.structure, onchain: dynWeights.onChain, volume: dynWeights.volume, oi: dynWeights.oi };
+    const minScore = regime === 'RANGE' ? 75 : 65; const baseRequired = isBacktest ? 50 : minScore;
+    const requiredScore = baseRequired + (isBacktest ? 0 : liquidity.scorePenalty + clusterPenalty);
+    const dynamic = getDynamicLevels(candles); const horizontal = getHorizontalSR(candles);
+    const support = Math.max(dynamic.support, horizontal.support); const resistance = Math.min(dynamic.resistance, horizontal.resistance);
+    let pa_score = getPriceActionScore(candles, signal);
+    if (data.price && support && resistance && pa_score === 45) {
+        const range = resistance - support; const pos = (data.price - support) / range;
+        if (signal === 'LONG') { pa_score = pos > 0.7 ? 75 : pos > 0.5 ? 65 : pos < 0.3 ? 45 : 55; }
+        else { pa_score = pos < 0.3 ? 75 : pos < 0.5 ? 65 : pos > 0.7 ? 45 : 55; }
+    }
+    const rsi = data.rsi || 50; let momentum_score = 50;
+    const over = (signal === 'LONG' && rsi > 70) || (signal === 'SHORT' && rsi < 30); const ali = (signal === 'LONG' && rsi > 50) || (signal === 'SHORT' && rsi < 50);
+    if (over) momentum_score = 35; else if (ali) momentum_score = 65;
+    let macro_score = 50; const good = (data.mvrv && data.mvrv < 0.85) && (data.sopr && data.sopr < 0.9); const bad = (data.mvrv && data.mvrv > 1.3) && (data.sopr && data.sopr > 1.1);
+    if (good) macro_score = 75; else if (bad) macro_score = 25;
+    let liq_score = isBacktest ? 60 : 50; const ml_prob = predictDirectionV3(data); const ml_score = 20 + ml_prob * 60;
+    let mtf_score = 50;
+    if (mtfData && mtfData.c1h?.length > 0) mtf_score = checkMTFAlignment(mtfData, signal, data.price).aligned ? 85 : 20;
+    let vol_score = 50; if (data.volume && data.avgVolume) { const volRel = data.volume / data.avgVolume; vol_score = volRel > 1.5 ? 70 : volRel > 1.0 ? 60 : 40; }
+    const fundingZ = getFundingZScore(data.fundingRate || 0, fundingHistory); let funding_score = 50;
+    if (signal === 'LONG' && fundingZ < -2) funding_score = 75; else if (signal === 'SHORT' && fundingZ > 2) funding_score = 75;
+    else if (signal === 'LONG' && fundingZ > 2) funding_score = 30; else if (signal === 'SHORT' && fundingZ < -2) funding_score = 30;
+    else if (Math.abs(fundingZ) > 1 && Math.abs(fundingZ) < 2) funding_score = 55;
+    const oiRisk = classifyOIRisk(data.oiDelta || 0, data.priceDeltaPct || 0); let oi_score = 50;
+    if (signal === 'LONG' && oiRisk === 'HEALTHY_LONG') oi_score = 80; else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_SHORT') oi_score = 80;
+    else if (signal === 'LONG' && oiRisk === 'SQUEEZE_RISK_LONG') oi_score = 30; else if (signal === 'SHORT' && oiRisk === 'SQUEEZE_RISK_SHORT') oi_score = 30;
+    let div_score = 50;
+    if (candles?.length > 0 && rsiVals?.length > 0) { div_score = Math.min(70, Math.max(30, 50 + detectDivergenceMultiV8(candles, rsiVals, macdVals, obvVals, signal, atr))); div_score = clamp(div_score + detectVolumeDeltaDivergence(candles, obvVals, signal), 20, 90); }
+    let trend_score = 50; if (candles?.length > 0) { const ts = getTrendStrength(candles); if (ts.trending && ts.adx > 40) trend_score = 80; else if (ts.trending) trend_score = 70; else if (ts.adx < 20) trend_score = 30; else trend_score = 50; }
+    const fw = getDynamicFilterWeights(regime);
+    const scores = { price_action: pa_score, momentum: momentum_score, macro_crypto: macro_score, liquidity_spread: liq_score, ml_probability: ml_score, mtf_alignment: mtf_score, volume_liquidity: vol_score, funding_onchain: funding_score, divergence_penalty: div_score, trend_strength: trend_score };
+    let oiBonus = (oi_score - 50) * 0.08;
+    const weights = { price_action: fw.price_action || 0.12, momentum: fw.momentum || 0.12, macro_crypto: fw.macro_crypto || 0.10, liquidity_spread: fw.liquidity_spread || 0.08, ml_probability: fw.ml_probability || 0.08, mtf_alignment: fw.mtf_alignment || 0.10, volume_liquidity: fw.volume_liquidity || 0.12, funding_onchain: fw.funding_onchain || 0.14, divergence_penalty: fw.divergence_penalty || 0.10, trend_strength: fw.trend_strength || 0.14 };
+    let finalScore = 0; for (const [key, w] of Object.entries(weights)) finalScore += (scores[key] || 50) * w;
+    finalScore = Math.min(100, Math.max(0, finalScore + mtfPenalty - clusterPenalty + oiBonus));
+    return { approved: finalScore >= requiredScore, score: finalScore, reasons: [`PA: ${scores.price_action.toFixed(0)}`, `Trend: ${scores.trend_strength.toFixed(0)}`, `Mom: ${scores.momentum.toFixed(0)}`, `Vol: ${scores.volume_liquidity.toFixed(0)}`, `MTF: ${scores.mtf_alignment.toFixed(0)}`, `OI: ${oi_score.toFixed(0)}`], regime, required: requiredScore, scoreBonus: finalScore >= requiredScore ? (finalScore - 50) * 0.3 : -25, scoreComponents: scores, support, resistance, volatilityRegime };
 }
 
 
 
 
 // ================================================================
-// SCORE INSTITUCIONAL (COM ATUALIZAÇÃO DE REGIME EM TEMPO REAL)
+// SCORE INSTITUCIONAL (DISPLAY)
 // ================================================================
-function refreshCurrentRegime(price, candleHistory) {
-    const closes = candleHistory.map(c => c.close);
-    const ema50 = calculateEMA(closes, 50) || price;
-    const ema200 = calculateEMA(closes, 200) || price;
+function refreshCurrentRegime(price, cHist) {
+    const closes = cHist.map(c => c.close); const ema50 = calculateEMA(closes, 50) || price; const ema200 = calculateEMA(closes, 200) || price;
     const ema50Prev = ema50History.length >= 2 ? ema50History[ema50History.length - 2] : ema50;
-    const trend = getTrendStrength(candleHistory);
-    const regime = detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, trend.adx || 25);
-    updateRegimeDisplay(regime);
-    currentRegime = regime;
-    return regime;
+    const regime = detectMarketRegimeFixed(price, ema50, ema50Prev, ema200, getTrendStrength(cHist).adx || 25);
+    updateRegimeDisplay(regime); currentRegime = regime; return regime;
 }
-
-
-
-
 function computeScore(data) {
     const hist = alertLog.filter(t => t.win !== null);
     if (hist.length > 20) {
-        const comps = ['trend', 'momentum', 'structure', 'onchain', 'volume', 'oi'];
-        const stats = {};
-        comps.forEach(c => stats[c] = { wins: 0, losses: 0 });
-        hist.forEach(t => {
-            if (!t.components) return;
-            const win = t.win === true;
-            Object.keys(t.components).forEach(key => {
-                if (stats[key]) {
-                    if (win) stats[key].wins++;
-                    else stats[key].losses++;
-                }
-            });
-        });
-        let total = 0;
-        const nw = {};
-        comps.forEach(key => {
-            const s = stats[key];
-            const wr = (s.wins + s.losses > 0) ? s.wins / (s.wins + s.losses) : 0.5;
-            nw[key] = wr;
-            total += wr;
-        });
+        const comps = ['trend', 'momentum', 'structure', 'onchain', 'volume', 'oi']; const stats = {}; comps.forEach(c => stats[c] = { wins: 0, losses: 0 });
+        hist.forEach(t => { if (!t.components) return; const win = t.win === true; Object.keys(t.components).forEach(key => { if (stats[key]) { if (win) stats[key].wins++; else stats[key].losses++; } }); });
+        let total = 0; const nw = {}; comps.forEach(key => { const s = stats[key]; const wr = (s.wins + s.losses > 0) ? s.wins / (s.wins + s.losses) : 0.5; nw[key] = wr; total += wr; });
         if (total > 0) comps.forEach(key => componentWeights[key] = nw[key] / total);
     }
-
-
-
-
-    const regime = currentRegime || 'BULL';
-    const dynWeights = getDynamicWeights(regime);
-    const weights = { trend: dynWeights.trend, momentum: dynWeights.momentum, structure: dynWeights.structure,
-        onchain: dynWeights.onChain, volume: dynWeights.volume, oi: dynWeights.oi };
-
-
-
-
-    const price = data.price || 60000;
-    const ema50 = data.ema50 || 65000;
-    const ema200 = data.ema200 || 62000;
-    const rsi = data.rsi !== undefined ? data.rsi : 45;
-    const macd = data.macd || 120;
-    const macdSignal = data.macdSignal || 100;
-    const roc = data.roc || -2.5;
-    const support = data.support || globalData.support || 58000;
-    const resistance = data.resistance || globalData.resistance || 70000;
-    const fvgZones = data.fvgZones || [{ low: 62000, high: 63500 }];
-    const mvrv = data.mvrv || 1.2;
-    const sopr = data.sopr || 0.95;
-    const volumeRel = data.volumeRel || 1.0;
-    const oiDelta = data.oiDelta || 0.0;
-
-
-
-
-    let t = (ema50 > ema200) ? 1 : -1;
-    let rsi_norm = clamp((rsi - 30) / 40, 0, 1);
-    let macd_diff = macd - macdSignal;
-    let macd_norm = clamp((macd_diff / 200) + 0.5, 0, 1);
-    let roc_norm = clamp((roc / 100) + 0.5, 0, 1);
-    let m = (rsi_norm + macd_norm + roc_norm) / 3;
-    let range = resistance - support;
-    let se_raw = (price - support) / range;
-    let se = 1 - clamp(se_raw, 0, 1);
-    let inFvg = fvgZones.some(f => price >= f.low && price <= f.high);
-    if (inFvg) se = Math.min(se + 0.2, 1);
-    let mvrv_norm = 1 - clamp((mvrv - 1) / 3, 0, 1);
-    let sopr_norm = clamp(sopr - 0.5, 0, 1);
-    let o = (mvrv_norm + sopr_norm) / 2;
-    let vol = clamp((volumeRel - 0.5) * 2, -1, 1);
-    vol = (vol + 1) / 2;
-    let oi = clamp(oiDelta / 20, -1, 1);
-    oi = (oi + 1) / 2;
-
-
-
-
-    let raw = t * weights.trend + m * weights.momentum + se * weights.structure + o * weights.onchain + vol * weights
-        .volume + oi * weights.oi;
-    raw = clamp((raw + 1) / 2, 0, 1);
-    let finalScore = raw * 100;
-    if (Math.abs(oiDelta) > 10) {
-        finalScore -= 10;
-        finalScore = clamp(finalScore, 0, 100);
-    }
-    const components = {
-        trend: (t * 50 + 50).toFixed(1),
-        momentum: (m * 50 + 50).toFixed(1),
-        structure: (se * 50 + 50).toFixed(1),
-        onchain: (o * 50 + 50).toFixed(1),
-        volume: (vol * 50 + 50).toFixed(1),
-        oi: (oi * 50 + 50).toFixed(1)
-    };
-    return { score: Math.round(finalScore), components };
+    const regime = currentRegime || 'BULL'; const dynWeights = getDynamicWeights(regime);
+    const weights = { trend: dynWeights.trend, momentum: dynWeights.momentum, structure: dynWeights.structure, onchain: dynWeights.onChain, volume: dynWeights.volume, oi: dynWeights.oi };
+    const price = data.price || 60000, ema50 = data.ema50 || 65000, ema200 = data.ema200 || 62000, rsi = data.rsi !== undefined ? data.rsi : 45;
+    const macd = data.macd || 120, macdSignal = data.macdSignal || 100, roc = data.roc || -2.5;
+    const support = data.support || globalData.support || 58000, resistance = data.resistance || globalData.resistance || 70000;
+    const fvgZones = data.fvgZones || [{ low: 62000, high: 63500 }], mvrv = data.mvrv || 1.2, sopr = data.sopr || 0.95;
+    const volumeRel = data.volumeRel || 1.0, oiDelta = data.oiDelta || 0.0;
+    let t = (ema50 > ema200) ? 1 : -1; let rsi_norm = clamp((rsi - 30) / 40, 0, 1); let macd_norm = clamp(((macd - macdSignal) / 200) + 0.5, 0, 1);
+    let roc_norm = clamp((roc / 100) + 0.5, 0, 1); let m = (rsi_norm + macd_norm + roc_norm) / 3;
+    let range = resistance - support; let se_raw = range > 0 ? (price - support) / range : 0.5; let se = 1 - clamp(se_raw, 0, 1);
+    if (fvgZones.some(f => price >= f.low && price <= f.high)) se = Math.min(se + 0.2, 1);
+    let o = ((1 - clamp((mvrv - 1) / 3, 0, 1)) + clamp(sopr - 0.5, 0, 1)) / 2;
+    let vol = (clamp((volumeRel - 0.5) * 2, -1, 1) + 1) / 2; let oi = (clamp(oiDelta / 20, -1, 1) + 1) / 2;
+    let raw = t * weights.trend + m * weights.momentum + se * weights.structure + o * weights.onchain + vol * weights.volume + oi * weights.oi;
+    raw = clamp((raw + 1) / 2, 0, 1); let finalScore = raw * 100;
+    if (Math.abs(oiDelta) > 10) finalScore = clamp(finalScore - 10, 0, 100);
+    return { score: Math.round(finalScore), components: { trend: (t * 50 + 50).toFixed(1), momentum: (m * 50 + 50).toFixed(1), structure: (se * 50 + 50).toFixed(1), onchain: (o * 50 + 50).toFixed(1), volume: (vol * 50 + 50).toFixed(1), oi: (oi * 50 + 50).toFixed(1) } };
 }
-
-
-
-
 function updateScoreDisplay(scoreData) {
-    const score = scoreData.score;
-    const components = scoreData.components;
-    const sv = document.getElementById('score-value');
-    const sb = document.getElementById('score-bar');
-
-    // FIX: Null-safe — evita crash se elementos não existem no DOM
-    if (sv) {
-        sv.textContent = score;
-        if (score >= 75) {
-            sv.style.color = 'var(--accent-green)';
-            if (sb) sb.style.background = 'var(--accent-green)';
-        } else if (score <= 25) {
-            sv.style.color = 'var(--accent-red)';
-            if (sb) sb.style.background = 'var(--accent-red)';
-        } else {
-            sv.style.color = 'var(--accent-yellow)';
-            if (sb) sb.style.background = 'var(--accent-yellow)';
-        }
-    }
-    if (sb) sb.style.width = score + '%';
-
-    // FIX: Null-safe para cada componente de score
-    const componentIds = {
-        'score-trend': components.trend,
-        'score-momentum': components.momentum,
-        'score-structure': components.structure,
-        'score-onchain': components.onchain,
-        'score-volume': components.volume,
-        'score-oi': components.oi,
-    };
-    for (const [id, value] of Object.entries(componentIds)) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value;
-    }
-
-
-
-
-    // FIX: Limite enforcement no histórico — evita memory leak progressivo
-    scoreHistory.push({ time: Date.now(), score: score });
-    if (scoreHistory.length > MAX_SCORE_HISTORY) {
-        scoreHistory.splice(0, scoreHistory.length - MAX_SCORE_HISTORY);
-    }
+    const score = scoreData.score; const components = scoreData.components;
+    const sv = document.getElementById('score-value'); const sb = document.getElementById('score-bar');
+    if (sv) { sv.textContent = score; sv.style.color = score >= 75 ? 'var(--accent-green)' : score <= 25 ? 'var(--accent-red)' : 'var(--accent-yellow)'; }
+    if (sb) { sb.style.width = score + '%'; sb.style.background = score >= 75 ? 'var(--accent-green)' : score <= 25 ? 'var(--accent-red)' : 'var(--accent-yellow)'; }
+    const compMap = { 'score-trend': components.trend, 'score-momentum': components.momentum, 'score-structure': components.structure, 'score-onchain': components.onchain, 'score-volume': components.volume, 'score-oi': components.oi };
+    for (const [id, value] of Object.entries(compMap)) { const el = document.getElementById(id); if (el) el.textContent = value; }
+    scoreHistory.push({ time: Date.now(), score }); if (scoreHistory.length > MAX_SCORE_HISTORY) scoreHistory.splice(0, scoreHistory.length - MAX_SCORE_HISTORY);
     updateScoreChart();
-
-
-
-
-    // FIX: checkAdditionalAlertsV13 era chamada mas nunca definida — stub adicionado
-    if (typeof checkAdditionalAlertsV13 === 'function') {
-        checkAdditionalAlertsV13(score, components);
-    }
+    if (typeof checkAdditionalAlertsV13 === 'function') checkAdditionalAlertsV13(score, components);
 }
 
 
 
 
 // ================================================================
-// GRÁFICO DE SCORE (PLUGIN LOCAL, NÃO GLOBAL)
+// GRÁFICO DE SCORE (CHART.JS)
 // ================================================================
 const thresholdPlugin = {
     id: 'customThresholdLines',
     beforeDraw: function(chart) {
-        const yScale = chart.scales.y;
-        if (!yScale) return;
-        const ctx = chart.ctx;
-        const y25 = yScale.getPixelForValue(25);
-        const y75 = yScale.getPixelForValue(75);
-        ctx.save();
-        ctx.setLineDash([6, 4]);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(233,69,96,0.5)';
-        ctx.beginPath();
-        ctx.moveTo(chart.chartArea.left, y25);
-        ctx.lineTo(chart.chartArea.right, y25);
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(0,217,142,0.5)';
-        ctx.beginPath();
-        ctx.moveTo(chart.chartArea.left, y75);
-        ctx.lineTo(chart.chartArea.right, y75);
-        ctx.stroke();
-        ctx.restore();
-        ctx.save();
-        ctx.fillStyle = 'rgba(233,69,96,0.7)';
-        ctx.font = '10px sans-serif';
-        ctx.fillText('SHORT (25)', chart.chartArea.right - 80, y25 - 6);
-        ctx.fillStyle = 'rgba(0,217,142,0.7)';
-        ctx.fillText('LONG (75)', chart.chartArea.right - 80, y75 - 6);
-        ctx.restore();
+        const yScale = chart.scales.y; if (!yScale) return; const ctx = chart.ctx;
+        [25, 75].forEach(val => {
+            const y = yScale.getPixelForValue(val); const isShort = val === 25;
+            ctx.save(); ctx.setLineDash([6, 4]); ctx.lineWidth = 1; ctx.strokeStyle = isShort ? 'rgba(233,69,96,0.5)' : 'rgba(0,217,142,0.5)';
+            ctx.beginPath(); ctx.moveTo(chart.chartArea.left, y); ctx.lineTo(chart.chartArea.right, y); ctx.stroke();
+            ctx.fillStyle = isShort ? 'rgba(233,69,96,0.7)' : 'rgba(0,217,142,0.7)'; ctx.font = '10px sans-serif';
+            ctx.fillText(isShort ? 'SHORT (25)' : 'LONG (75)', chart.chartArea.right - 80, y - 6); ctx.restore();
+        });
     }
 };
-
-
-
-
 function initScoreChart() {
-    const canvas = document.getElementById('scoreHistoryChart');
-    if (!canvas || typeof Chart === 'undefined') return;
-    // Plugin é passado apenas para esta instância, não registrado globalmente
+    const canvas = document.getElementById('scoreHistoryChart'); if (!canvas || typeof Chart === 'undefined') return;
     scoreChart = new Chart(canvas, {
-        type: 'line',
-        data: { datasets: [{ label: 'Score Institucional', data: [], borderColor: '#00b4d8',
-                backgroundColor: 'rgba(0,180,216,0.1)', borderWidth: 2, fill: true, tension: 0.3,
-                pointRadius: 1, pointHoverRadius: 4 }] },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            // FIX: animation desativada para performance em updates frequentes
-            animation: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) {
-                            return 'Score: ' + context.parsed.y.toFixed(0);
-                        }, title: function(items) { return new Date(items[0].parsed.x).toLocaleString(
-                            'pt-BR'); } } } },
-            scales: {
-                x: { type: 'linear', grid: { color: 'rgba(44,62,80,0.3)' }, ticks: { color: '#95a5a6',
-                        callback: function(value) { return new Date(value).toLocaleTimeString('pt-BR',
-                            { hour: '2-digit', minute: '2-digit' }); }, maxTicksLimit: 15,
-                        autoSkip: true } },
-                y: { min: 0, max: 100, grid: { color: 'rgba(44,62,80,0.3)' }, ticks: { color: '#95a5a6' } }
-            },
-            elements: { line: { tension: 0.3 } }
-        },
-        plugins: [thresholdPlugin] // plugin local
-    });
-    updateScoreChart();
+        type: 'line', data: { datasets: [{ label: 'Score Institucional', data: [], borderColor: '#00b4d8', backgroundColor: 'rgba(0,180,216,0.1)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 1, pointHoverRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => 'Score: ' + ctx.parsed.y.toFixed(0), title: items => new Date(items[0].parsed.x).toLocaleString('pt-BR') } } }, scales: { x: { type: 'linear', grid: { color: 'rgba(44,62,80,0.3)' }, ticks: { color: '#95a5a6', maxTicksLimit: 15, autoSkip: true, callback: v => new Date(v).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) } }, y: { min: 0, max: 100, grid: { color: 'rgba(44,62,80,0.3)' }, ticks: { color: '#95a5a6' } } } },
+        plugins: [thresholdPlugin]
+    }); updateScoreChart();
 }
-
-
-
-
 function updateScoreChart() {
-    if (!scoreChart) return;
-    const now = Date.now();
+    if (!scoreChart) return; const now = Date.now();
     const msMap = { '1h': 3600000, '6h': 21600000, '12h': 43200000, '24h': 86400000, '7d': 604800000 };
-    const limit = msMap[currentScoreTimeframe] || 86400000;
-    const cutoff = now - limit;
-    let filtered = scoreHistory.filter(p => p.time >= cutoff);
-
-    // FIX: Downsample para no máximo 300 pontos — evita reflow excessivo no Canvas
-    const maxPoints = 300;
-    if (filtered.length > maxPoints) {
-        const step = Math.ceil(filtered.length / maxPoints);
-        filtered = filtered.filter((_, i) => i % step === 0);
-    }
-
-    scoreChart.data.datasets[0].data = filtered.map(p => ({ x: p.time, y: p.score }));
-    scoreChart.update('none');
+    let filtered = scoreHistory.filter(p => p.time >= now - (msMap[currentScoreTimeframe] || 86400000));
+    if (filtered.length > 300) { const step = Math.ceil(filtered.length / 300); filtered = filtered.filter((_, i) => i % step === 0); }
+    scoreChart.data.datasets[0].data = filtered.map(p => ({ x: p.time, y: p.score })); scoreChart.update('none');
 }
-
-
-
-
-// FIX: Handler de clique dos botões de timeframe — estava truncado no original
 document.addEventListener('click', function(e) {
-    const btn = e.target.closest('#score-tf-buttons .tf-btn');
-    if (!btn) return;
-    const parent = btn.closest('#score-tf-buttons');
-    if (!parent) return;
+    const btn = e.target.closest('#score-tf-buttons .tf-btn'); if (!btn) return;
+    const parent = btn.closest('#score-tf-buttons'); if (!parent) return;
     parent.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentScoreTimeframe = btn.dataset.tf || '1h';
-    updateScoreChart();
+    btn.classList.add('active'); currentScoreTimeframe = btn.dataset.tf || '1h'; updateScoreChart();
 });
 
 
 
 
 // ================================================================
-// FIX: fetchCandles — referenciada em fetchMTFData() mas nunca definida
+// MOTOR DE DADOS (API BINANCE & RENDERIZAÇÃO)
 // ================================================================
 async function fetchCandles(symbol, interval, limit) {
     try {
-        const r = await fetch(
-            `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
-        );
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const data = await r.json();
-        return data.map(k => ({
-            time: k[0],
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
-            closeTime: k[6],
-        }));
-    } catch (e) {
-        console.warn(`⚠️ Falha ao buscar candles ${symbol} ${interval}:`, e);
-        return null;
-    }
+        const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        if (!r.ok) throw new Error('HTTP ' + r.status); const data = await r.json();
+        return data.map(k => ({ time: k[0], open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5]) }));
+    } catch (e) { console.warn(`⚠️ Falha candles ${interval}:`, e); return null; }
 }
-
-
-
-
-// ================================================================
-// FIX: checkAdditionalAlertsV13 — chamada em updateScoreDisplay() mas nunca definida
-// Implementação mínima como placeholder — substituir pela lógica real
-// ================================================================
+async function fetchTickerData() {
+    try {
+        const r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+        if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json();
+    } catch (e) { console.warn('⚠️ Falha Ticker:', e); return null; }
+}
+function processIndicators() {
+    if (candleHistory.length < 50) return; const closes = candleHistory.map(c => c.close); const currentPrice = closes[closes.length - 1];
+    globalData.price = currentPrice; globalData.ema50 = calculateEMA(closes, 50) || currentPrice;
+    globalData.ema200 = calculateEMA(closes, 200) || currentPrice; globalData.rsi = calculateRSI(closes, 14);
+    globalData.macd = calculateMACD(closes) || 0; globalData.atr = calculateATR(closes);
+    updateLiveSupportResistance(); refreshCurrentRegime(currentPrice, candleHistory);
+}
+function updateHeaderUI(ticker) {
+    if (!ticker) return; const priceEl = document.getElementById('btc-price'); const changeEl = document.getElementById('btc-change');
+    if (priceEl) priceEl.textContent = formatCurrency(parseFloat(ticker.lastPrice));
+    if (changeEl) { const change = parseFloat(ticker.priceChangePercent); changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%'; changeEl.className = 'badge ' + (change >= 0 ? 'sentiment-bullish' : 'sentiment-bearish'); }
+}
+function initCandleCharts() {
+    CANDLE_INTERVALS.forEach(interval => {
+        fetchCandles('BTCUSDT', interval, 50).then(candles => {
+            if (!candles || typeof LightweightCharts === 'undefined') return;
+            const container = document.getElementById(`chart-${interval}`); if (!container) return;
+            const chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth, height: 250,
+                layout: { background: { color: '#1a1a2e' }, textColor: '#95a5a6' },
+                grid: { vertLines: { color: '#2c3e50' }, horzLines: { color: '#2c3e50' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal }, timeScale: { timeVisible: true, secondsVisible: false },
+            });
+            const series = chart.addCandlestickSeries({ upColor: '#00d98e', downColor: '#e94560', borderDownColor: '#e94560', borderUpColor: '#00d98e', wickDownColor: '#e94560', wickUpColor: '#00d98e' });
+            series.setData(candles.map(c => ({ time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close })));
+            candleCharts[interval] = { chart, series };
+            new ResizeObserver(entries => { if (entries[0]) chart.applyOptions({ width: entries[0].contentRect.width }); }).observe(container);
+        });
+    });
+}
+function updateCandleCharts() {
+    CANDLE_INTERVALS.forEach(async (interval) => {
+        const candles = await fetchCandles('BTCUSDT', interval, 50);
+        if (candles && candleCharts[interval]?.series) {
+            candleCharts[interval].series.setData(candles.map(c => ({ time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close })));
+        }
+    });
+}
 function checkAdditionalAlertsV13(score, components) {
-    const now = Date.now();
-    if (now - lastAlertTime < ALERT_COOLDOWN) return;
-
-    // Exemplo: alertar quando score cruza thresholds extremos
-    if (score >= 85) {
-        const regime = currentRegime || 'NEUTRO';
-        console.log(`🔔 Score alto detectado: ${score} | Regime: ${regime}`);
-        // Descomentar para ativar alertas reais via Telegram:
-        // sendTelegramAlert(`🔥 <b>SCORE EXTREMO: ${score}/100</b>\nRegime: ${regime}\n⏰ ${getCurrentTimestamp()}`);
-        // lastAlertTime = now;
-    }
-
-    if (score <= 15) {
-        const regime = currentRegime || 'NEUTRO';
-        console.log(`🔔 Score baixo detectado: ${score} | Regime: ${regime}`);
-        // Descomentar para ativar alertas reais via Telegram:
-        // sendTelegramAlert(`📉 <b>SCORE MÍNIMO: ${score}/100</b>\nRegime: ${regime}\n⏰ ${getCurrentTimestamp()}`);
-        // lastAlertTime = now;
-    }
+    const now = Date.now(); if (now - lastAlertTime < ALERT_COOLDOWN) return;
+    if (score >= 85 || score <= 15) { console.log(`🔔 Score extremo: ${score} | Regime: ${currentRegime}`); lastAlertTime = now; }
 }
-
-
-
-
-// ================================================================
-// FIX: Carregamento do alertLog do localStorage com validação
-// ================================================================
 function loadAlertLog() {
     try {
-        const saved = localStorage.getItem('alertLog');
-        if (!saved) return;
-        const parsed = JSON.parse(saved);
-        if (!Array.isArray(parsed)) return;
-        // Validar que cada entrada tem ao menos timestamp numérico
-        alertLog = parsed.filter(t =>
-            t && typeof t === 'object' && typeof t.timestamp === 'number'
-        );
-    } catch (e) {
-        console.warn('⚠️ Falha ao carregar alertLog do localStorage:', e);
-        alertLog = [];
-        localStorage.removeItem('alertLog');
-    }
+        const saved = localStorage.getItem('alertLog'); if (!saved) return; const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) return; alertLog = parsed.filter(t => t && typeof t === 'object' && typeof t.timestamp === 'number');
+    } catch (e) { console.warn('⚠️ Falha alertLog:', e); alertLog = []; localStorage.removeItem('alertLog'); }
 }
 
 
 
 
 // ================================================================
-// FIX: Inicialização — o código original não tinha ponto de entrada
+// LOOP PRINCIPAL E INICIALIZAÇÃO
 // ================================================================
+let isUpdating = false;
+async function mainLoop() {
+    if (isUpdating) return; isUpdating = true;
+    try {
+        const ticker = await fetchTickerData(); updateHeaderUI(ticker);
+        const candles1h = await fetchCandles('BTCUSDT', '1h', 100);
+        if (candles1h && candles1h.length > 0) {
+            candleHistory = candles1h;
+            const ema50 = calculateEMA(candles1h.map(c=>c.close), 50); if(ema50) ema50History.push(ema50); if(ema50History.length > 200) ema50History.shift();
+            processIndicators(); updateScoreDisplay(computeScore(globalData));
+        }
+        updateCandleCharts();
+    } catch (e) { console.error('❌ Erro no loop principal:', e); }
+    isUpdating = false;
+}
 function initApp() {
     console.log('🚀 BTC Analyzer v13 — Inicializando...');
-    loadWeightsV6();
-    loadAlertLog();
-    initScoreChart();
-    console.log(`✅ Pronto. AlertLog: ${alertLog.length} registros | Pesos carregados.`);
+    loadWeightsV6(); loadAlertLog(); initScoreChart();
+    console.log('⏳ Buscando dados da Binance...');
+    initCandleCharts(); mainLoop(); setInterval(mainLoop, 15000);
+    console.log('✅ Motor de dados ativo. Atualizando a cada 15s.');
 }
-
-// Executar init quando o DOM estiver pronto
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
-    initApp();
-}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initApp); } else { initApp(); }
