@@ -4,16 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Institucional — Score + Alertas + Backtest</title>
-
-  <!-- CSS externo -->
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Bibliotecas externas (mantidas) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 <div class="container">
+
   <header>
     <div class="header-content">
       <h1 class="header-title">📊 RELATÓRIO INSTITUCIONAL — Score + Alertas + Backtest</h1>
@@ -31,6 +28,7 @@
     </div>
   </header>
 
+  <!-- SCORE INSTITUCIONAL -->
   <section>
     <div class="score-card">
       <div class="score-label">Score Institucional</div>
@@ -45,9 +43,13 @@
         <div class="score-detail-item"><span class="label">Volume</span> <span class="value" id="score-volume">--</span></div>
         <div class="score-detail-item"><span class="label">OI Delta</span> <span class="value" id="score-oi">--</span></div>
       </div>
+      <div class="section-timestamp" style="margin-top:12px;font-size:.8em;color:var(--text-muted);">
+        Última atualização: <span class="timestamp-value" id="ts-score">--</span>
+      </div>
     </div>
   </section>
 
+  <!-- GRÁFICO DE EVOLUÇÃO DO SCORE -->
   <section>
     <div class="score-chart-section">
       <div class="score-chart-header">
@@ -66,9 +68,13 @@
         <span><span class="line-neu"></span> Neutro (25–75)</span>
         <span><span class="line-bear"></span> Abaixo de 25 (SHORT)</span>
       </div>
+      <div class="section-timestamp" style="margin-top:8px;font-size:.8em;color:var(--text-muted);text-align:right;">
+        Última atualização: <span class="timestamp-value" id="ts-score-chart">--</span>
+      </div>
     </div>
   </section>
 
+  <!-- RESUMO EXECUTIVO -->
   <section>
     <h2 class="section-title">📌 RESUMO EXECUTIVO</h2>
     <div class="summary-grid">
@@ -81,6 +87,7 @@
     <div id="update-info" style="margin-top:10px;font-size:.85em;color:var(--text-muted);text-align:right;">Última atualização geral: <span id="last-update">--</span></div>
   </section>
 
+  <!-- CANDLESTICKS -->
   <section>
     <h2 class="section-title">🕯️ GRÁFICOS DE CANDLESTICK (LIVE)</h2>
     <div class="candles-grid">
@@ -88,8 +95,12 @@
       <div class="candle-card"><h3>Ethereum (ETH/USDT)</h3><div class="tf-buttons" data-symbol="ETHUSDT"><button class="tf-btn" data-tf="1m">1m</button><button class="tf-btn" data-tf="5m">5m</button><button class="tf-btn" data-tf="15m">15m</button><button class="tf-btn active" data-tf="1h">1h</button><button class="tf-btn" data-tf="4h">4h</button><button class="tf-btn" data-tf="1d">1D</button><button class="tf-btn" data-tf="1w">1S</button></div><div class="candle-stats" id="eth-stats"><span class="stat" id="eth-stat-1d"><span class="label">1D</span> --</span><span class="stat" id="eth-stat-1s"><span class="label">1S</span> --</span><span class="stat" id="eth-stat-1m"><span class="label">1M</span> --</span></div><div id="candle-eth" class="candle-container"></div><div class="candle-legend"><span><span class="up">🟢</span> Alta</span><span><span class="down">🔴</span> Baixa</span><span>⏱️ <span id="eth-tf-label">1h</span></span></div><span class="source-with-time" id="candle-eth-source">Binance (WebSocket) • atualização instantânea</span></div>
       <div class="candle-card"><h3>Solana (SOL/USDT)</h3><div class="tf-buttons" data-symbol="SOLUSDT"><button class="tf-btn" data-tf="1m">1m</button><button class="tf-btn" data-tf="5m">5m</button><button class="tf-btn" data-tf="15m">15m</button><button class="tf-btn active" data-tf="1h">1h</button><button class="tf-btn" data-tf="4h">4h</button><button class="tf-btn" data-tf="1d">1D</button><button class="tf-btn" data-tf="1w">1S</button></div><div class="candle-stats" id="sol-stats"><span class="stat" id="sol-stat-1d"><span class="label">1D</span> --</span><span class="stat" id="sol-stat-1s"><span class="label">1S</span> --</span><span class="stat" id="sol-stat-1m"><span class="label">1M</span> --</span></div><div id="candle-sol" class="candle-container"></div><div class="candle-legend"><span><span class="up">🟢</span> Alta</span><span><span class="down">🔴</span> Baixa</span><span>⏱️ <span id="sol-tf-label">1h</span></span></div><span class="source-with-time" id="candle-sol-source">Binance (WebSocket) • atualização instantânea</span></div>
     </div>
+    <div class="section-timestamp" style="margin-top:8px;font-size:.8em;color:var(--text-muted);text-align:right;">
+      Última atualização: <span class="timestamp-value" id="ts-candles">--</span>
+    </div>
   </section>
 
+  <!-- ANÁLISE ON-CHAIN & DERIVADOS -->
   <section>
     <h2 class="section-title">⛓️ ANÁLISE ON-CHAIN &amp; DERIVADOS</h2>
     <div class="table-wrapper">
@@ -120,8 +131,12 @@
       </table>
     </div>
     <div class="chart-wrapper"><canvas id="chart_etf_flows"></canvas></div>
+    <div class="section-timestamp" style="margin-top:8px;font-size:.8em;color:var(--text-muted);text-align:right;">
+      Última atualização (ETF Flows): <span class="timestamp-value" id="ts-etf">--</span>
+    </div>
   </section>
 
+  <!-- PAINEL DE CONFIRMAÇÃO DE FUNDO -->
   <section>
     <h2 class="section-title">✅ PAINEL DE CONFIRMAÇÃO DE FUNDO</h2>
     <div class="confirmation-panel">
@@ -133,9 +148,13 @@
         <div class="confirmation-pillar"><div class="pillar-status" id="p-macro">❌</div><div class="pillar-name">Macro Suporta</div></div>
       </div>
       <div class="confirmation-description"><strong>Análise:</strong> 3/5 pilares confirmam fundo. Mercado em capitulação tática.</div>
+      <div class="section-timestamp" style="margin-top:12px;font-size:.8em;color:var(--text-muted);">
+        Última atualização: <span class="timestamp-value" id="ts-confirmacao">--</span>
+      </div>
     </div>
   </section>
 
+  <!-- MACRO (referência) -->
   <section>
     <h2 class="section-title">🌍 INDICADORES MACROECONÔMICOS (referência)</h2>
     <div class="table-wrapper">
@@ -152,8 +171,12 @@
       </table>
     </div>
     <div class="chart-wrapper"><canvas id="chart_macro_rates"></canvas></div>
+    <div class="section-timestamp" style="margin-top:8px;font-size:.8em;color:var(--text-muted);text-align:right;">
+      Última atualização (Macro): <span class="timestamp-value" id="ts-macro">--</span>
+    </div>
   </section>
 
+  <!-- ATIVIDADE DE BALEIAS -->
   <section>
     <h2 class="section-title">🐋 ATIVIDADE DE BALEIAS (referência)</h2>
     <div class="whale-activity" id="whale-container">
@@ -163,8 +186,12 @@
     </div>
     <div class="chart-wrapper"><canvas id="chart_whale_flow"></canvas></div>
     <div class="confirmation-description" id="whale-summary"><strong>Smart Money Direction (referência):</strong> BTC acumulando, ETH distribuindo, SOL acumulando.</div>
+    <div class="section-timestamp" style="margin-top:12px;font-size:.8em;color:var(--text-muted);">
+      Última atualização (Baleias): <span class="timestamp-value" id="ts-whale">--</span>
+    </div>
   </section>
 
+  <!-- STABLECOINS & DEFI -->
   <section>
     <h2 class="section-title">💰 STABLECOINS &amp; DEFI (referência)</h2>
     <div class="table-wrapper">
@@ -177,8 +204,12 @@
         </tbody>
       </table>
     </div>
+    <div class="section-timestamp" style="margin-top:8px;font-size:.8em;color:var(--text-muted);text-align:right;">
+      Última atualização: <span class="timestamp-value" id="ts-defi">--</span>
+    </div>
   </section>
 
+  <!-- SCORES DE ANÁLISE -->
   <section>
     <h2 class="section-title">📈 SCORES DE ANÁLISE</h2>
     <div class="score-container">
@@ -193,15 +224,23 @@
         <span class="conviction-badge conviction-bearish">🔴 BEARISH CONVICTION</span>
         <span class="on-chain-cycle">📉 Ciclo On-Chain: MARKDOWN</span>
       </div>
+      <div class="section-timestamp" style="margin-top:12px;font-size:.8em;color:var(--text-muted);">
+        Última atualização: <span class="timestamp-value" id="ts-scores">--</span>
+      </div>
     </div>
   </section>
 
+  <!-- CENÁRIOS & MATRIZ DE APORTE -->
   <section>
     <h2 class="section-title">🎯 CENÁRIOS &amp; MATRIZ DE APORTE</h2>
     <div class="chart-wrapper"><canvas id="chart_scenarios"></canvas></div>
     <div class="chart-wrapper"><canvas id="chart_allocation"></canvas></div>
+    <div class="section-timestamp" style="margin-top:8px;font-size:.8em;color:var(--text-muted);text-align:right;">
+      Última atualização: <span class="timestamp-value" id="ts-cenarios">--</span>
+    </div>
   </section>
 
+  <!-- BACKTEST -->
   <section>
     <h2 class="section-title">📊 BACKTEST — V13 (CORRIGIDO)</h2>
     <div class="backtest-section">
@@ -241,7 +280,6 @@
 
 <button class="telegram-test-btn" id="test-telegram-btn"><span id="test-btn-label">📨 Testar Alerta</span></button>
 
-<!-- JavaScript externo (carregado por último) -->
 <script src="script.js"></script>
 </body>
 </html>
