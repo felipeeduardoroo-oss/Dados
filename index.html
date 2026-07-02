@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Institucional — Score + Alertas + Backtest</title>
   <link rel="stylesheet" href="style.css" />
+  window.onerror = function(msg, url, line, col, error) {
+    alert('ERRO DETECTADO:\n' + msg + '\nLinha: ' + line);
+    return false;
+};
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
